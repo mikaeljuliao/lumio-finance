@@ -1,34 +1,45 @@
 /**
- * gastos.js — Persistência temporária de gastos em arquivo JSON.
- * Esta solução será substituída por PostgreSQL + Prisma no próximo passo.
+ * gastos.js — Operações de persistência de gastos via Prisma.
  */
+const prisma = require('./database');
 
-const fs = require('fs');
-const path = require('path');
+async function salvarGasto(dados) {
+  // Converte data "YYYY-MM-DD" para Date UTC
+  const dataGasto = dados.data ? new Date(dados.data + 'T00:00:00Z') : new Date();
 
-const ARQUIVO_GASTOS = path.join(__dirname, 'gastos_local.json');
-
-function carregarGastos() {
-  try {
-    if (!fs.existsSync(ARQUIVO_GASTOS)) return [];
-    return JSON.parse(fs.readFileSync(ARQUIVO_GASTOS, 'utf-8'));
-  } catch {
-    return [];
-  }
+  return await prisma.gasto.create({
+    data: {
+      valor: dados.valor,
+      categoria: dados.categoria,
+      descricao: dados.descricao,
+      data: dataGasto,
+    },
+  });
 }
 
-function salvarGasto(gasto) {
-  const gastos = carregarGastos();
-  const novoGasto = { ...gasto, id: Date.now().toString() };
-  gastos.push(novoGasto);
-  fs.writeFileSync(ARQUIVO_GASTOS, JSON.stringify(gastos, null, 2), 'utf-8');
-  return novoGasto;
+async function buscarTodosGastos() {
+  return await prisma.gasto.findMany({
+    orderBy: { data: 'desc' },
+  });
 }
 
-function gastosDoMesAtual(todosGastos) {
-  const agora = new Date();
-  const anoMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
-  return todosGastos.filter(g => g.data && g.data.startsWith(anoMes));
+async function buscarGastosDoMes(mes, ano) {
+  const inicioMes = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
+  const fimMes = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
+
+  return await prisma.gasto.findMany({
+    where: {
+      data: {
+        gte: inicioMes,
+        lte: fimMes,
+      },
+    },
+    orderBy: { data: 'desc' },
+  });
 }
 
-module.exports = { carregarGastos, salvarGasto, gastosDoMesAtual };
+module.exports = {
+  salvarGasto,
+  buscarTodosGastos,
+  buscarGastosDoMes,
+};

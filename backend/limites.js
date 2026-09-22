@@ -1,49 +1,55 @@
 /**
- * limites.js — Sistema de limites financeiros por categoria.
- * Os limites são salvos em limites.json na pasta do backend.
+ * limites.js — Operações de limites financeiros via Prisma.
  */
+const prisma = require('./database');
 
-const fs = require('fs');
-const path = require('path');
+async function definirLimite(categoria, valor) {
+  const cat = categoria.toLowerCase().trim();
+  return await prisma.limite.upsert({
+    where: { categoria: cat },
+    update: { valor: Number(valor) },
+    create: { categoria: cat, valor: Number(valor) },
+  });
+}
 
-const ARQUIVO_LIMITES = path.join(__dirname, 'limites.json');
+async function removerLimite(categoria) {
+  const cat = categoria.toLowerCase().trim();
+  return await prisma.limite.deleteMany({
+    where: { categoria: cat },
+  });
+}
 
-function carregarLimites() {
-  try {
-    if (!fs.existsSync(ARQUIVO_LIMITES)) return {};
-    return JSON.parse(fs.readFileSync(ARQUIVO_LIMITES, 'utf-8'));
-  } catch {
-    return {};
+async function buscarTodosLimites() {
+  const registros = await prisma.limite.findMany();
+  const mapa = {};
+  for (const item of registros) {
+    mapa[item.categoria] = Number(item.valor);
   }
+  return mapa;
 }
 
-function salvarLimites(limites) {
-  fs.writeFileSync(ARQUIVO_LIMITES, JSON.stringify(limites, null, 2), 'utf-8');
-}
+async function verificarLimites(valorGasto, categoriaGasto, mes, ano) {
+  const inicioMes = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
+  const fimMes = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
 
-function definirLimite(categoria, valor) {
-  const limites = carregarLimites();
-  limites[categoria.toLowerCase()] = Number(valor);
-  salvarLimites(limites);
-}
+  const [limites, gastosDoMes] = await Promise.all([
+    buscarTodosLimites(),
+    prisma.gasto.findMany({
+      where: {
+        data: {
+          gte: inicioMes,
+          lte: fimMes,
+        },
+      },
+    }),
+  ]);
 
-function removerLimite(categoria) {
-  const limites = carregarLimites();
-  delete limites[categoria.toLowerCase()];
-  salvarLimites(limites);
-}
-
-function listarLimites() {
-  return carregarLimites();
-}
-
-function verificarLimites(valorGasto, categoriaGasto, gastosDoMes) {
-  const limites = carregarLimites();
   const alertas = [];
+  const catNormalizada = (categoriaGasto || '').toLowerCase().trim();
 
   const totalMes = gastosDoMes.reduce((acc, g) => acc + Number(g.valor), 0);
   const totalCategoria = gastosDoMes
-    .filter(g => g.categoria === categoriaGasto)
+    .filter(g => (g.categoria || '').toLowerCase().trim() === catNormalizada)
     .reduce((acc, g) => acc + Number(g.valor), 0);
 
   if (limites['geral']) {
@@ -55,12 +61,13 @@ function verificarLimites(valorGasto, categoriaGasto, gastosDoMes) {
     }
   }
 
-  if (limites[categoriaGasto]) {
-    const percCat = (totalCategoria / limites[categoriaGasto]) * 100;
+  if (limites[catNormalizada]) {
+    const limiteCat = limites[catNormalizada];
+    const percCat = (totalCategoria / limiteCat) * 100;
     if (percCat >= 100) {
-      alertas.push(`🚩 *Limite de "${categoriaGasto}" atingido!*\nGasto: R$ ${totalCategoria.toFixed(2)} / Limite: R$ ${limites[categoriaGasto].toFixed(2)}`);
+      alertas.push(`🚩 *Limite de "${catNormalizada}" atingido!*\nGasto: R$ ${totalCategoria.toFixed(2)} / Limite: R$ ${limiteCat.toFixed(2)}`);
     } else if (percCat >= 80) {
-      alertas.push(`⚠️ *${percCat.toFixed(0)}% do limite de "${categoriaGasto}" usado!*\nGasto: R$ ${totalCategoria.toFixed(2)} / Limite: R$ ${limites[categoriaGasto].toFixed(2)}`);
+      alertas.push(`⚠️ *${percCat.toFixed(0)}% do limite de "${catNormalizada}" usado!*\nGasto: R$ ${totalCategoria.toFixed(2)} / Limite: R$ ${limiteCat.toFixed(2)}`);
     }
   }
 
@@ -78,7 +85,7 @@ function formatarLimites(limites) {
 module.exports = {
   definirLimite,
   removerLimite,
-  listarLimites,
+  buscarTodosLimites,
   verificarLimites,
   formatarLimites,
 };

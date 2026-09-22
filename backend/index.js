@@ -15,8 +15,8 @@ const pino = require('pino');
 const QRCode = require('qrcode');
 const { extrairGastos, detectarIntencao } = require('./gemini');
 const { transcreverAudio } = require('./transcrever');
-const { salvarGasto, carregarGastos, gastosDoMesAtual } = require('./gastos');
-const { definirLimite, listarLimites, verificarLimites, formatarLimites } = require('./limites');
+const { salvarGasto } = require('./gastos');
+const { definirLimite, buscarTodosLimites, verificarLimites, formatarLimites } = require('./limites');
 
 const app = express();
 app.use(cors());
@@ -34,9 +34,11 @@ let isConnected = false;
 
 async function notificarSeLimiteAtingido(valorGasto, categoriaGasto, remoteJid) {
   try {
-    const todos = carregarGastos();
-    const gastosDoMes = gastosDoMesAtual(todos);
-    const alertas = verificarLimites(valorGasto, categoriaGasto, gastosDoMes);
+    const agora = new Date();
+    const mesAtual = agora.getMonth() + 1;
+    const anoAtual = agora.getFullYear();
+
+    const alertas = await verificarLimites(valorGasto, categoriaGasto, mesAtual, anoAtual);
     for (const alerta of alertas) {
       await sock.sendMessage(remoteJid, { text: alerta });
     }
@@ -125,12 +127,12 @@ async function connectToWhatsApp() {
           const { intencao, valor, categoria } = await detectarIntencao(textoMensagem);
 
           if (intencao === 'DEFINIR_LIMITE' && valor && categoria) {
-            definirLimite(categoria, valor);
+            await definirLimite(categoria, valor);
             await sock.sendMessage(remoteJid, {
-              text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${valor.toFixed(2)}* por mês.`
+              text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${Number(valor).toFixed(2)}* por mês.`
             }, { quoted: msg });
           } else if (intencao === 'VER_LIMITES') {
-            const limites = listarLimites();
+            const limites = await buscarTodosLimites();
             await sock.sendMessage(remoteJid, {
               text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}`
             }, { quoted: msg });
@@ -158,21 +160,21 @@ async function registrarGasto(dadosGasto, remoteJid, msg) {
   if (!dadosGasto || !dadosGasto.valor) return;
 
   console.log('✅ Gasto extraído:', dadosGasto);
-  const gastoSalvo = salvarGasto(dadosGasto);
+  const gastoSalvo = await salvarGasto(dadosGasto);
 
   await sock.sendMessage(remoteJid, {
-    text: `✅ *Registrado:* R$ ${dadosGasto.valor}\n📝 ${dadosGasto.descricao}\n📁 Categoria: *${dadosGasto.categoria}*`
+    text: `✅ *Registrado:* R$ ${Number(dadosGasto.valor).toFixed(2)}\n📝 ${dadosGasto.descricao}\n📁 Categoria: *${dadosGasto.categoria}*`
   }, { quoted: msg });
 
   await notificarSeLimiteAtingido(dadosGasto.valor, dadosGasto.categoria, remoteJid);
 
   io.emit('novo_gasto', {
     id: gastoSalvo.id,
-    valor: Number(dadosGasto.valor),
-    categoria: dadosGasto.categoria,
-    descricao: dadosGasto.descricao,
-    data: dadosGasto.data,
-    created_at: new Date().toISOString()
+    valor: Number(gastoSalvo.valor),
+    categoria: gastoSalvo.categoria,
+    descricao: gastoSalvo.descricao,
+    data: gastoSalvo.data,
+    created_at: gastoSalvo.criadoEm ? gastoSalvo.criadoEm.toISOString() : new Date().toISOString()
   });
 }
 

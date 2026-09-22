@@ -1,0 +1,26 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Gasto {
+  id        Int      @id @default(autoincrement())
+  valor     Decimal  @db.Decimal(10, 2)
+  categoria String
+  descricao String
+  data      DateTime @db.Date
+  criadoEm  DateTime @default(now())
+}
+
+model Limite {
+  id           Int      @id @default(autoincrement())
+  categoria    String   @unique
+  valor        Decimal  @db.Decimal(10, 2)
+  atualizadoEm DateTime @updatedAt
+}

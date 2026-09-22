@@ -6,14 +6,14 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'placeholder'
 const key = process.env.GEMINI_API_KEY || '';
 console.log(`[SISTEMA] Iniciando Gemini com a chave: ${key.substring(0, 8)}...${key.substring(key.length - 4)}`);
 
-// Categorias Sincronizadas com o Frontend
+// Categorias sincronizadas com o frontend
 const CATEGORIAS_LISTA = [
-  'alimentação', 'transporte', 'lazer', 'saúde', 'moradia', 
-  'mercado', 'educação', 'serviços', 'compras', 'presentes', 
+  'alimentação', 'transporte', 'lazer', 'saúde', 'moradia',
+  'mercado', 'educação', 'serviços', 'compras', 'presentes',
   'viagem', 'investimentos', 'outros'
 ];
 
-// Dicionário de Gatilhos (Vacina contra erros da IA)
+// Dicionário de termos para categorização local (fallback sem IA)
 const DICIONARIO_CATEGORIAS = {
   'investimentos': ['ação', 'ações', 'fundo', 'fii', 'investimento', 'investir', 'bolsa', 'crypto', 'bitcoin', 'tesouro', 'selic', 'cdb'],
   'lazer': ['festa', 'balada', 'cinema', 'show', 'diversão', 'diversao', 'bar', 'cerveja', 'chope', 'chopp', 'rolê', 'game', 'playstation', 'steam', 'xbox'],
@@ -31,7 +31,6 @@ const DICIONARIO_CATEGORIAS = {
 
 function categorizarLocalmente(texto) {
   const t = texto.toLowerCase();
-  // Busca por termos específicos
   for (const [cat, palavras] of Object.entries(DICIONARIO_CATEGORIAS)) {
     if (palavras.some(p => t.includes(p))) return cat;
   }
@@ -58,6 +57,7 @@ async function detectarIntencao(texto) {
     text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     return JSON.parse(text);
   } catch (e) {
+    // Fallback local se a IA falhar
     if (texto.toLowerCase().includes('limite') || texto.toLowerCase().includes('máximo')) {
       return { intencao: 'DEFINIR_LIMITE', valor: parseFloat(texto.match(/\d+/)?.[0]) || 0, categoria: categorizarLocalmente(texto) };
     }
@@ -90,8 +90,8 @@ async function extrairGastos(textoMensagem) {
       let text = response.text().trim();
       text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(text);
-      
-      // Override local para garantir precisão
+
+      // Override local para garantir precisão em casos que a IA erra
       const catLocal = categorizarLocalmente(textoMensagem);
       if (catLocal !== 'outros' && (parsed.categoria === 'outros' || parsed.categoria === 'moradia' || parsed.categoria === 'serviços')) {
         parsed.categoria = catLocal;
@@ -104,7 +104,7 @@ async function extrairGastos(textoMensagem) {
     }
   }
 
-  // Fallback Local
+  // Fallback local se todos os modelos falharem
   const matchValor = textoMensagem.match(/(\d+(?:[.,]\d+)?)/);
   return {
     valor: matchValor ? parseFloat(matchValor[0].replace(',', '.')) : null,
@@ -114,22 +114,4 @@ async function extrairGastos(textoMensagem) {
   };
 }
 
-async function extrairGastoDeAudio(audioBuffer, mimeType) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-  try {
-    const result = await model.generateContent([
-      { text: PROMPT_SISTEMA_GASTO },
-      { inlineData: { data: audioBuffer.toString('base64'), mimeType: mimeType.split(';')[0] } }
-    ]);
-    const response = await result.response;
-    let text = response.text().trim();
-    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(text);
-    if (parsed.valor) parsed.valor = Number(parsed.valor);
-    return parsed;
-  } catch (error) {
-    throw error;
-  }
-}
-
-module.exports = { extrairGastos, extrairGastoDeAudio, detectarIntencao };
+module.exports = { extrairGastos, detectarIntencao };

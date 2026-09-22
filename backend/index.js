@@ -3,22 +3,20 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  Browsers,
+  fetchLatestBaileysVersion,
+  downloadMediaMessage
+} = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const { extrairGastos, detectarIntencao } = require('./gemini');
 const { transcreverAudio } = require('./transcrever');
-const supabase = require('./supabase');
-const {
-  definirLimite,
-  removerLimite,
-  listarLimites,
-  verificarLimitesLocal,
-  salvarGastoLocal,
-  carregarGastosLocal,
-  gastosDoMesAtual,
-  formatarLimites,
-} = require('./limites');
+const { salvarGasto, carregarGastos, gastosDoMesAtual } = require('./gastos');
+const { definirLimite, listarLimites, verificarLimites, formatarLimites } = require('./limites');
 
 const app = express();
 app.use(cors());
@@ -32,26 +30,13 @@ let sock = null;
 let currentQR = null;
 let isConnected = false;
 
-// ─── Verificação e alerta de limites ────────────────────────────────────────
+// ─── Verificação e notificação de limites via WhatsApp ───────────────────────
 
-async function verificarENotificarLimites(valorGasto, categoriaGasto, remoteJid) {
+async function notificarSeLimiteAtingido(valorGasto, categoriaGasto, remoteJid) {
   try {
-    let gastosDoMes = [];
-    try {
-      const agora = new Date();
-      const primeiroDiaMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-01`;
-      const { data, error } = await supabase
-        .from('gastos')
-        .select('valor, categoria, data')
-        .gte('data', primeiroDiaMes);
-      if (!error && data) gastosDoMes = data;
-      else throw new Error('Supabase error');
-    } catch {
-      const todos = carregarGastosLocal();
-      gastosDoMes = gastosDoMesAtual(todos);
-    }
-
-    const alertas = verificarLimitesLocal(valorGasto, categoriaGasto, gastosDoMes);
+    const todos = carregarGastos();
+    const gastosDoMes = gastosDoMesAtual(todos);
+    const alertas = verificarLimites(valorGasto, categoriaGasto, gastosDoMes);
     for (const alerta of alertas) {
       await sock.sendMessage(remoteJid, { text: alerta });
     }
@@ -64,13 +49,13 @@ async function verificarENotificarLimites(valorGasto, categoriaGasto, remoteJid)
 
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  
+  const { version } = await fetchLatestBaileysVersion();
+
   sock = makeWASocket({
     version,
     auth: state,
     printQRInTerminal: true,
-    logger: pino({ level: 'info' }),
+    logger: pino({ level: 'silent' }),
     browser: Browsers.macOS('Desktop')
   });
 
@@ -78,17 +63,19 @@ async function connectToWhatsApp() {
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
+
     if (qr) {
       try {
         currentQR = await QRCode.toDataURL(qr);
         isConnected = false;
         io.emit('qr', currentQR);
       } catch (err) {
-        console.error('Erro ao gerar imagem QR', err);
+        console.error('Erro ao gerar imagem QR:', err);
       }
     }
+
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       currentQR = null;
       isConnected = false;
       io.emit('disconnected');
@@ -101,7 +88,7 @@ async function connectToWhatsApp() {
     }
   });
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       try {
         if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
@@ -119,13 +106,14 @@ async function connectToWhatsApp() {
         const remoteJid = msg.key.remoteJid;
         const isFromMe = msg.key.fromMe;
 
-        // Ignorar mensagens de sistema
-        if (textoMensagem.includes('✅ *Registrado:*') || textoMensagem.includes('🚨') || textoMensagem.includes('🚩') || textoMensagem.includes('📋 *Seus limites') || textoMensagem.includes('🤖 *Comandos') || textoMensagem.includes('✅ Limite de')) {
-          continue;
-        }
+        // Ignorar mensagens enviadas pelo próprio bot
+        const ehMensagemDoBot = [
+          '✅ *Registrado:*', '🚨', '🚩', '📋 *Seus limites', '🤖 *Comandos', '✅ Limite de'
+        ].some(prefix => textoMensagem.includes(prefix));
+
+        if (ehMensagemDoBot) continue;
 
         if (isAudio && isFromMe) {
-          // Processar áudio como gasto (fluxo padrão)
           const buffer = await downloadMediaMessage(msg, 'buffer', {});
           const textoTranscrito = await transcreverAudio(buffer, content.audioMessage.mimetype);
           if (textoTranscrito) {
@@ -133,52 +121,62 @@ async function connectToWhatsApp() {
             await registrarGasto(dadosGasto, remoteJid, msg);
           }
         } else if (textoMensagem && (isFromMe || textoMensagem.toLowerCase().includes('gastei') || textoMensagem.toLowerCase().includes('paguei') || textoMensagem.toLowerCase().includes('limite'))) {
-          // Detectar intenção para mensagens de texto
           console.log(`🔍 Analisando intenção: "${textoMensagem}"`);
           const { intencao, valor, categoria } = await detectarIntencao(textoMensagem);
 
           if (intencao === 'DEFINIR_LIMITE' && valor && categoria) {
             definirLimite(categoria, valor);
-            await sock.sendMessage(remoteJid, { text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${valor.toFixed(2)}* por mês.` }, { quoted: msg });
+            await sock.sendMessage(remoteJid, {
+              text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${valor.toFixed(2)}* por mês.`
+            }, { quoted: msg });
           } else if (intencao === 'VER_LIMITES') {
             const limites = listarLimites();
-            await sock.sendMessage(remoteJid, { text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}` }, { quoted: msg });
+            await sock.sendMessage(remoteJid, {
+              text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}`
+            }, { quoted: msg });
           } else if (intencao === 'REGISTRAR_GASTO') {
             const dadosGasto = await extrairGastos(textoMensagem);
             await registrarGasto(dadosGasto, remoteJid, msg);
           } else if (textoMensagem.startsWith('/ajuda')) {
-            const ajuda = `🤖 *Como me usar:*\n\n` +
+            const ajuda =
+              `🤖 *Como me usar:*\n\n` +
               `1️⃣ *Registrar Gasto:* Basta falar natural, ex: "gastei 50 no bar" ou "paguei 100 de luz".\n\n` +
               `2️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "quero gastar no máximo 500 em lazer".\n\n` +
               `3️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
-              `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, assinaturas, lazer, compras, presentes, outros.`;
+              `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, serviços, lazer, compras, presentes, outros.`;
             await sock.sendMessage(remoteJid, { text: ajuda }, { quoted: msg });
           }
         }
       } catch (err) {
-        console.error('Erro no loop:', err);
+        console.error('Erro ao processar mensagem:', err);
       }
     }
   });
 }
 
 async function registrarGasto(dadosGasto, remoteJid, msg) {
-  if (dadosGasto && dadosGasto.valor) {
-    console.log('✅ SUCESSO:', dadosGasto);
-    let gastoId = Date.now().toString();
-    try {
-      const { data, error } = await supabase.from('gastos').insert([{ valor: dadosGasto.valor, categoria: dadosGasto.categoria, descricao: dadosGasto.descricao, data: dadosGasto.data }]).select();
-      if (!error && data) gastoId = data[0].id;
-    } catch (e) {
-      salvarGastoLocal(dadosGasto);
-    }
+  if (!dadosGasto || !dadosGasto.valor) return;
 
-    await sock.sendMessage(remoteJid, { text: `✅ *Registrado:* R$ ${dadosGasto.valor}\n📝 ${dadosGasto.descricao}\n📁 Categoria: *${dadosGasto.categoria}*` }, { quoted: msg });
-    await verificarENotificarLimites(dadosGasto.valor, dadosGasto.categoria, remoteJid);
-    io.emit('novo_gasto', { id: gastoId, valor: Number(dadosGasto.valor), categoria: dadosGasto.categoria, descricao: dadosGasto.descricao, data: dadosGasto.data, created_at: new Date().toISOString() });
-  }
+  console.log('✅ Gasto extraído:', dadosGasto);
+  const gastoSalvo = salvarGasto(dadosGasto);
+
+  await sock.sendMessage(remoteJid, {
+    text: `✅ *Registrado:* R$ ${dadosGasto.valor}\n📝 ${dadosGasto.descricao}\n📁 Categoria: *${dadosGasto.categoria}*`
+  }, { quoted: msg });
+
+  await notificarSeLimiteAtingido(dadosGasto.valor, dadosGasto.categoria, remoteJid);
+
+  io.emit('novo_gasto', {
+    id: gastoSalvo.id,
+    valor: Number(dadosGasto.valor),
+    categoria: dadosGasto.categoria,
+    descricao: dadosGasto.descricao,
+    data: dadosGasto.data,
+    created_at: new Date().toISOString()
+  });
 }
 
 connectToWhatsApp();
+
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`Servidor na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));

@@ -6,23 +6,32 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'placeholder'
 const key = process.env.GEMINI_API_KEY || '';
 console.log(`[SISTEMA] Iniciando Gemini com a chave: ${key.substring(0, 8)}...${key.substring(key.length - 4)}`);
 
-const CATEGORIAS_LISTA = ['alimentação', 'transporte', 'saúde', 'mercado', 'moradia', 'educação', 'assinaturas', 'lazer', 'compras', 'presentes', 'outros', 'geral'];
+// Categorias Sincronizadas com o Frontend
+const CATEGORIAS_LISTA = [
+  'alimentação', 'transporte', 'lazer', 'saúde', 'moradia', 
+  'mercado', 'educação', 'serviços', 'compras', 'presentes', 
+  'viagem', 'investimentos', 'outros'
+];
 
+// Dicionário de Gatilhos (Vacina contra erros da IA)
 const DICIONARIO_CATEGORIAS = {
-  'educação': ['curso', 'faculdade', 'escola', 'aula', 'estudo', 'livro', 'mensalidade', 'udemy', 'alura', 'rocketseat', 'dev', 'fullstack', 'programação'],
-  'lazer': ['festa', 'balada', 'cinema', 'viagem', 'show', 'diversão', 'diversao', 'passeio', 'praia', 'hotel', 'airbnb', 'bar', 'cerveja', 'pub'],
-  'compras': ['roupa', 'tenis', 'tênis', 'sapato', 'camiseta', 'calça', 'shopping', 'eletrônico', 'celular', 'fone', 'headset', 'acessório'],
-  'presentes': ['presente', 'mimo', 'doação', 'lembrancinha', 'aniversário'],
-  'alimentação': ['comida', 'lanche', 'salgado', 'pizza', 'rodízio', 'rodizio', 'ifood', 'rappi', 'marmita', 'café', 'padaria'],
-  'transporte': ['uber', '99', 'taxi', 'táxi', 'gasolina', 'combustível', 'onibus', 'ônibus', 'passagem', 'metrô'],
-  'saúde': ['remédio', 'remedio', 'farmácia', 'farmacia', 'médico', 'medico', 'consulta', 'exame', 'dentista', 'academia', 'suplemento', 'whey'],
-  'mercado': ['mercado', 'supermercado', 'atacado', 'atacadão', 'compras do mês', 'sacolão'],
-  'moradia': ['aluguel', 'condomínio', 'condominio', 'conta de luz', 'energia', 'internet', 'wifi', 'água', 'iptu', 'reforma'],
-  'assinaturas': ['netflix', 'spotify', 'prime', 'icloud', 'google one', 'chatgpt', 'openai', 'mensalidade']
+  'investimentos': ['ação', 'ações', 'fundo', 'fii', 'investimento', 'investir', 'bolsa', 'crypto', 'bitcoin', 'tesouro', 'selic', 'cdb'],
+  'lazer': ['festa', 'balada', 'cinema', 'show', 'diversão', 'diversao', 'bar', 'cerveja', 'chope', 'chopp', 'rolê', 'game', 'playstation', 'steam', 'xbox'],
+  'viagem': ['avião', 'hotel', 'airbnb', 'passagem', 'viagem', 'viajar', 'hospedagem', 'turismo', 'mala'],
+  'educação': ['curso', 'faculdade', 'escola', 'aula', 'estudo', 'livro', 'mensalidade', 'udemy', 'alura', 'programação', 'dev', 'bootcamp'],
+  'serviços': ['luz', 'água', 'gas', 'gás', 'energia', 'internet', 'wifi', 'assinatura', 'netflix', 'spotify', 'prime', 'mensalidade', 'celular', 'plano'],
+  'moradia': ['aluguel', 'condomínio', 'condominio', 'iptu', 'reforma', 'móvel', 'casa', 'apartamento', 'quarto'],
+  'alimentação': ['comida', 'lanche', 'salgado', 'pizza', 'ifood', 'rappi', 'restaurante', 'marmita', 'padaria', 'café', 'almoço', 'jantar'],
+  'transporte': ['uber', '99', 'taxi', 'táxi', 'gasolina', 'combustível', 'onibus', 'ônibus', 'metrô', 'pedágio', 'estacionamento'],
+  'saúde': ['remédio', 'remedio', 'farmácia', 'médico', 'dentista', 'hospital', 'exame', 'academia', 'suplemento', 'whey', 'psicólogo'],
+  'mercado': ['mercado', 'supermercado', 'compras do mês', 'atacadão', 'feira', 'sacolão'],
+  'compras': ['roupa', 'sapato', 'tênis', 'shopping', 'celular', 'fone', 'eletrônico', 'ferramenta', 'presente'],
+  'presentes': ['presente', 'mimo', 'doação', 'lembrancinha', 'aniversário']
 };
 
 function categorizarLocalmente(texto) {
   const t = texto.toLowerCase();
+  // Busca por termos específicos
   for (const [cat, palavras] of Object.entries(DICIONARIO_CATEGORIAS)) {
     if (palavras.some(p => t.includes(p))) return cat;
   }
@@ -30,22 +39,14 @@ function categorizarLocalmente(texto) {
 }
 
 const PROMPT_INTENCAO = `
-Você é um cérebro financeiro. Analise a mensagem do usuário e identifique a intenção.
-Responda APENAS com um JSON.
-
+Você é um cérebro financeiro. Analise a mensagem do usuário.
 INTENÇÕES:
-1. "REGISTRAR_GASTO": O usuário está informando que gastou dinheiro (ex: "gastei 50 no bar").
-2. "DEFINIR_LIMITE": O usuário quer estabelecer um teto de gastos (ex: "quero gastar no máximo 500 em lazer", "meu limite de mercado é 1000", "limite mensal 2000").
-3. "VER_LIMITES": O usuário quer saber seus limites ou quanto gastou (ex: "quais meus limites?", "quanto já gastei?").
-4. "OUTRO": Nenhuma das anteriores.
+1. "REGISTRAR_GASTO": Ex: "gastei 50 no bar"
+2. "DEFINIR_LIMITE": Ex: "limite de 500 em lazer"
+3. "VER_LIMITES": Ex: "quanto já gastei?"
 
-Categorias válidas: ${CATEGORIAS_LISTA.join(', ')}. "geral" é para o limite total do mês.
-
-Exemplo retorno DEFINIR_LIMITE:
-{"intencao": "DEFINIR_LIMITE", "valor": 500, "categoria": "lazer"}
-
-Exemplo retorno REGISTRAR_GASTO:
-{"intencao": "REGISTRAR_GASTO"}
+Categorias: ${CATEGORIAS_LISTA.join(', ')}, geral.
+Retorne JSON: {"intencao": "string", "valor": num, "categoria": "string"}
 `;
 
 async function detectarIntencao(texto) {
@@ -57,24 +58,23 @@ async function detectarIntencao(texto) {
     text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     return JSON.parse(text);
   } catch (e) {
-    // Fallback simples por Regex se a IA falhar
-    if (texto.toLowerCase().includes('limite') || texto.toLowerCase().includes('máximo') || texto.toLowerCase().includes('maximo')) {
-      const valor = texto.match(/(\d+(?:[.,]\d+)?)/);
-      const cat = categorizarLocalmente(texto);
-      return { intencao: 'DEFINIR_LIMITE', valor: valor ? parseFloat(valor[0].replace(',', '.')) : null, categoria: texto.toLowerCase().includes('mensal') || texto.toLowerCase().includes('geral') ? 'geral' : cat };
+    if (texto.toLowerCase().includes('limite') || texto.toLowerCase().includes('máximo')) {
+      return { intencao: 'DEFINIR_LIMITE', valor: parseFloat(texto.match(/\d+/)?.[0]) || 0, categoria: categorizarLocalmente(texto) };
     }
     return { intencao: 'REGISTRAR_GASTO' };
   }
 }
 
 const PROMPT_SISTEMA_GASTO = `
-Você é um assistente financeiro de elite. Extraia os dados do gasto.
-CATEGORIAS: ${CATEGORIAS_LISTA.join(', ')}.
+Você é um assistente financeiro de ELITE.
+CATEGORIAS PERMITIDAS: ${CATEGORIAS_LISTA.join(', ')}
 
-REGRAS:
-- "moradia" é só para ALUGUEL, LUZ, ÁGUA, INTERNET.
-- "compras" é para ROUPAS, OBJETOS, ELETRÔNICOS.
-- "lazer" é para DIVERSÃO, VIAGEM, CINEMA, BAR.
+REGRAS DE OURO:
+- "investimentos": Ações, fundos imobiliários (FII), cripto, qualquer aporte financeiro.
+- "lazer": Gastos com diversão, bares, jogos, entretenimento.
+- "serviços": Contas recorrentes (luz, água, internet, assinaturas de apps).
+- "moradia": Aluguel, condomínio, IPTU.
+- "viagem": Hotéis, passagens, gastos em trânsito de férias.
 
 Retorne JSON: {"valor": num, "categoria": "string", "descricao": "string", "data": "YYYY-MM-DD"}
 `;
@@ -91,16 +91,20 @@ async function extrairGastos(textoMensagem) {
       text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(text);
       
-      const categoriaForçada = categorizarLocalmente(textoMensagem);
-      if (categoriaForçada !== 'outros' && (parsed.categoria === 'moradia' || parsed.categoria === 'outros')) {
-        parsed.categoria = categoriaForçada;
+      // Override local para garantir precisão
+      const catLocal = categorizarLocalmente(textoMensagem);
+      if (catLocal !== 'outros' && (parsed.categoria === 'outros' || parsed.categoria === 'moradia' || parsed.categoria === 'serviços')) {
+        parsed.categoria = catLocal;
       }
+
       if (parsed.valor) parsed.valor = Number(parsed.valor);
       return parsed;
     } catch (error) {
       console.warn(`Erro no modelo ${modelName}:`, error.message);
     }
   }
+
+  // Fallback Local
   const matchValor = textoMensagem.match(/(\d+(?:[.,]\d+)?)/);
   return {
     valor: matchValor ? parseFloat(matchValor[0].replace(',', '.')) : null,

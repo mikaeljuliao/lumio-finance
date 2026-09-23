@@ -468,7 +468,9 @@ io.on('connection', (socket) => {
   });
 });
 
-connectToWhatsApp();
-
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
+server.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+  connectToWhatsApp();
+});

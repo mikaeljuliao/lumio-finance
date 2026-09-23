@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { calculateStats } from "../lib/utils";
 
-const API_BASE = "http://localhost:3001/api";
+const API_BASE = "https://powerful-essence-production-0894.up.railway.app/";
 
 export function useGastos(filtroData) {
   const [gastos, setGastos] = useState([]);

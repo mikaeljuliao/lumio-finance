@@ -19,7 +19,7 @@ export function useWhatsAppSocket(onNewGasto) {
   }, []);
 
   useEffect(() => {
-    const socket = io("http://localhost:3001");
+    const socket = io("https://powerful-essence-production-0894.up.railway.app/");
     socketRef.current = socket;
 
     socket.on("qr", (qr) => {

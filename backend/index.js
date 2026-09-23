@@ -393,12 +393,6 @@ async function connectToWhatsApp() {
         try {
           if (!msg?.message || msg.key?.remoteJid === 'status@broadcast') continue;
 
-          const isFromMe = Boolean(msg.key?.fromMe);
-          if (isFromMe) {
-            console.log('[WHATSAPP] Ignorando mensagem enviada pelo próprio bot/WhatsApp para não reprocessar confirmação.');
-            continue;
-          }
-
           const dedupeKey = buildMessageDedupKey(msg);
           if (!shouldProcessMessage(msg)) {
             console.log(`[WHATSAPP] Ignorando mensagem duplicada: ${dedupeKey}`);

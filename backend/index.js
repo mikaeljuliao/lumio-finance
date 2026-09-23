@@ -290,7 +290,6 @@ async function connectToWhatsApp() {
             content.videoMessage?.caption ||
             '';
           const remoteJid = msg.key.remoteJid;
-          const isFromMe = msg.key.fromMe;
 
           // Ignorar mensagens de sistema enviadas pelo próprio bot
           if (
@@ -306,7 +305,7 @@ async function connectToWhatsApp() {
 
           console.log(`[WHATSAPP] Mensagem recebida de ${remoteJid}: "${textoMensagem || '[Áudio]'}"`);
 
-          if (isAudio && isFromMe) {
+          if (isAudio) {
             console.log('[AUDIO] Processando mensagem de áudio...');
             const buffer = await downloadMediaMessage(msg, 'buffer', {});
             const textoTranscrito = await transcreverAudio(
@@ -318,13 +317,7 @@ async function connectToWhatsApp() {
               const dadosGasto = await extrairGastos(textoTranscrito);
               await registrarGasto(dadosGasto, remoteJid, msg);
             }
-          } else if (
-            textoMensagem &&
-            (isFromMe ||
-              textoMensagem.toLowerCase().includes('gastei') ||
-              textoMensagem.toLowerCase().includes('paguei') ||
-              textoMensagem.toLowerCase().includes('limite'))
-          ) {
+          } else if (textoMensagem) {
             console.log(`🔍 Analisando intenção com Gemini: "${textoMensagem}"`);
             const { intencao, valor, categoria } = await detectarIntencao(
               textoMensagem

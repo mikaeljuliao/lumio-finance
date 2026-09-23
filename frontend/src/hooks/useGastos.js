@@ -10,8 +10,8 @@ export function useGastos(filtroData) {
   const fetchGastosELimites = useCallback(async () => {
     try {
       const [resGastos, resLimites] = await Promise.all([
-        fetch(`${API_BASE}/gastos`),
-        fetch(`${API_BASE}/limites`),
+        fetch(`${API_BASE}api/gastos`),
+        fetch(`${API_BASE}api/limites`),
       ]);
       if (resGastos.ok) {
         const dataGastos = await resGastos.json();
@@ -70,7 +70,7 @@ export function useGastos(filtroData) {
   const setLimite = useCallback(async (categoria, valor) => {
     try {
       setLimites((prev) => ({ ...prev, [categoria]: Number(valor) }));
-      await fetch(`${API_BASE}/limites`, {
+      await fetch(`${API_BASE}api/limites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoria, valor }),
@@ -87,7 +87,7 @@ export function useGastos(filtroData) {
         delete atualizados[categoria];
         return atualizados;
       });
-      await fetch(`${API_BASE}/limites/${encodeURIComponent(categoria)}`, {
+      await fetch(`${API_BASE}api/limites/${encodeURIComponent(categoria)}`, {
         method: "DELETE",
       });
     } catch (err) {

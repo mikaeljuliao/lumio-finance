@@ -137,6 +137,7 @@ async function connectToWhatsApp() {
   try {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
     const { version } = await fetchLatestBaileysVersion();
+    console.log('[WHATSAPP] Versão Baileys obtida:', version);
     const logger = pino({ level: 'error' });
 
     if (sock) {
@@ -169,6 +170,10 @@ async function connectToWhatsApp() {
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
+      if (connection === 'connecting') {
+        console.log('[WHATSAPP] STATUS: connecting — QR possivelmente escaneado, aguardando autenticação...');
+      }
+
       if (qr) {
         try {
           console.log('[WHATSAPP] Novo QR Code gerado com sucesso!');
@@ -187,7 +192,11 @@ async function connectToWhatsApp() {
           lastDisconnect?.error?.output?.statusCode ||
           lastDisconnect?.error?.statusCode ||
           0;
-        console.log(`[WHATSAPP] Conexão encerrada. Código: ${statusCode}`);
+        console.log(`[WHATSAPP] Conexão encerrada. Código: ${statusCode}`, {
+          errorMessage: lastDisconnect?.error?.message,
+          errorPayload: lastDisconnect?.error?.output?.payload,
+          errorDetails: lastDisconnect?.error,
+        });
 
         currentQR = null;
         isConnected = false;

@@ -40,7 +40,7 @@ export default function Home() {
     [addGasto]
   );
 
-  const { socketConnected, qrCode } = useWhatsAppSocket(handleNewGasto);
+  const { socketConnected, qrCode, connectWhatsApp, disconnectWhatsApp } = useWhatsAppSocket(handleNewGasto);
 
   // Estados de Controle dos Modais
   const [editingGasto, setEditingGasto] = useState(null);
@@ -109,8 +109,11 @@ export default function Home() {
         <Header
           filtroData={filtroData}
           socketConnected={socketConnected}
+          qrCode={qrCode}
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
+          onConnect={connectWhatsApp}
+          onDisconnect={disconnectWhatsApp}
         />
 
         {!socketConnected && qrCode && <QrCodeSection qrCode={qrCode} />}

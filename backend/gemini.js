@@ -3,8 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'placeholder');
 
-const key = process.env.GEMINI_API_KEY || '';
-console.log(`[SISTEMA] Iniciando Gemini com a chave: ${key.substring(0, 8)}...${key.substring(key.length - 4)}`);
+console.log('[SISTEMA] Iniciando módulo Gemini');
 
 // Categorias sincronizadas com o frontend
 const CATEGORIAS_LISTA = [

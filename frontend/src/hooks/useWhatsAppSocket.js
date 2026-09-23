@@ -1,12 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import io from "socket.io-client";
 
 export function useWhatsAppSocket(onNewGasto) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [qrCode, setQrCode] = useState(null);
+  const socketRef = useRef(null);
+
+  const connectWhatsApp = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.emit("connect_whatsapp");
+    }
+  }, []);
+
+  const disconnectWhatsApp = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.emit("disconnect_whatsapp");
+    }
+  }, []);
 
   useEffect(() => {
     const socket = io("http://localhost:3001");
+    socketRef.current = socket;
 
     socket.on("qr", (qr) => {
       setQrCode(qr);
@@ -19,6 +33,7 @@ export function useWhatsAppSocket(onNewGasto) {
     });
 
     socket.on("disconnected", () => {
+      setQrCode(null);
       setSocketConnected(false);
     });
 
@@ -30,11 +45,14 @@ export function useWhatsAppSocket(onNewGasto) {
 
     return () => {
       socket.disconnect();
+      socketRef.current = null;
     };
   }, [onNewGasto]);
 
   return {
     socketConnected,
-    qrCode
+    qrCode,
+    connectWhatsApp,
+    disconnectWhatsApp
   };
 }

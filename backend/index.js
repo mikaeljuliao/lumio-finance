@@ -47,37 +47,6 @@ let reconnectAttempts = 0;
 let consecutive428Count = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const AUTH_FOLDER = path.join(__dirname, 'auth_info_baileys');
-const processedMessageKeys = new Map();
-const MESSAGE_DEDUPE_TTL_MS = 60 * 60 * 1000;
-
-function buildMessageDedupKey(msg) {
-  const key = msg?.key || {};
-  const remoteJid = key.remoteJid || key.participant || 'unknown';
-  const messageId = key.id || 'missing-message-id';
-  return `${remoteJid}:${messageId}`;
-}
-
-function shouldProcessMessage(msg) {
-  const key = msg?.key || {};
-  const dedupeKey = buildMessageDedupKey(msg);
-  const now = Date.now();
-  const lastSeen = processedMessageKeys.get(dedupeKey);
-
-  if (lastSeen && now - lastSeen < MESSAGE_DEDUPE_TTL_MS) {
-    return false;
-  }
-
-  processedMessageKeys.set(dedupeKey, now);
-
-  if (processedMessageKeys.size > 20000) {
-    const oldestKey = processedMessageKeys.keys().next().value;
-    if (oldestKey) {
-      processedMessageKeys.delete(oldestKey);
-    }
-  }
-
-  return true;
-}
 
 // ─── REST API (PostgreSQL / Prisma) ──────────────────────────────────────────
 
@@ -148,88 +117,6 @@ async function verificarENotificarLimites(valorGasto, categoriaGasto, remoteJid)
     }
   } catch (err) {
     console.error('[ERRO] Falha ao verificar limites:', err.message);
-  }
-}
-
-async function processarMensagemDeLimite(remoteJid, textoMensagem, msg) {
-  try {
-    console.log(`🔍 [LIMITE] Analisando intenção de limite: "${textoMensagem}"`);
-    const { intencao, valor, categoria } = await detectarIntencao(textoMensagem);
-    console.log(`🔍 [LIMITE] Intenção detectada: ${intencao} | Valor: ${valor} | Categoria: ${categoria}`);
-
-    if (intencao === 'DEFINIR_LIMITE' && valor && categoria) {
-      await definirLimite(categoria, valor);
-      await sock.sendMessage(
-        remoteJid,
-        {
-          text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${Number(
-            valor
-          ).toFixed(2)}* por mês.`,
-        },
-        { quoted: msg }
-      );
-      return;
-    }
-
-    if (intencao === 'VER_LIMITES') {
-      const limites = await buscarTodosLimites();
-      await sock.sendMessage(
-        remoteJid,
-        { text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}` },
-        { quoted: msg }
-      );
-      return;
-    }
-
-    if (textoMensagem.startsWith('/ajuda')) {
-      const ajuda =
-        `🤖 *Como me usar:*\n\n` +
-        `1️⃣ *Registrar Gasto:* Basta falar natural, ex: "gastei 50 no bar" ou "paguei 100 de luz".\n\n` +
-        `2️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "quero gastar no máximo 500 em lazer".\n\n` +
-        `3️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
-        `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, assinaturas, lazer, compras, presentes, outros.`;
-      await sock.sendMessage(remoteJid, { text: ajuda }, { quoted: msg });
-    }
-  } catch (err) {
-    console.error('[ERRO] Falha no processamento de limite:', err);
-  }
-}
-
-async function processarMensagemDeGasto(remoteJid, textoMensagem, msg, content) {
-  try {
-    if (content.audioMessage) {
-      console.log('[AUDIO] Processando mensagem de áudio...');
-      const buffer = await downloadMediaMessage(msg, 'buffer', {});
-      const textoTranscrito = await transcreverAudio(
-        buffer,
-        content.audioMessage.mimetype
-      );
-      if (textoTranscrito) {
-        console.log(`[AUDIO] Transcrição: "${textoTranscrito}"`);
-        const dadosGasto = await extrairGastos(textoTranscrito);
-        await registrarGasto(dadosGasto, remoteJid, msg);
-      }
-      return;
-    }
-
-    if (!textoMensagem) {
-      return;
-    }
-
-    console.log(`🔍 [GASTO] Analisando intenção de gasto: "${textoMensagem}"`);
-    const { intencao, valor, categoria } = await detectarIntencao(textoMensagem);
-    console.log(`🔍 [GASTO] Intenção detectada: ${intencao} | Valor: ${valor} | Categoria: ${categoria}`);
-
-    if (intencao !== 'REGISTRAR_GASTO') {
-      return;
-    }
-
-    console.log(`[IA] Extraindo gasto da mensagem: "${textoMensagem}"`);
-    const dadosGasto = await extrairGastos(textoMensagem);
-    console.log(`[IA] Gasto extraído:`, dadosGasto);
-    await registrarGasto(dadosGasto, remoteJid, msg);
-  } catch (err) {
-    console.error('[ERRO] Falha no processamento de gasto:', err);
   }
 }
 
@@ -380,24 +267,9 @@ async function connectToWhatsApp() {
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (!Array.isArray(messages) || messages.length === 0) {
-        return;
-      }
-
-      if (type === 'history') {
-        console.log('[WHATSAPP] Ignorando evento de history sync do Baileys.');
-        return;
-      }
-
       for (const msg of messages) {
         try {
-          if (!msg?.message || msg.key?.remoteJid === 'status@broadcast') continue;
-
-          const dedupeKey = buildMessageDedupKey(msg);
-          if (!shouldProcessMessage(msg)) {
-            console.log(`[WHATSAPP] Ignorando mensagem duplicada: ${dedupeKey}`);
-            continue;
-          }
+          if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
 
           const getMessageContent = (m) => {
             if (m.viewOnceMessageV2?.message)
@@ -418,7 +290,9 @@ async function connectToWhatsApp() {
             content.videoMessage?.caption ||
             '';
           const remoteJid = msg.key.remoteJid;
+          const isFromMe = msg.key.fromMe;
 
+          // Ignorar mensagens de sistema enviadas pelo próprio bot
           if (
             textoMensagem.includes('✅ *Registrado:*') ||
             textoMensagem.includes('🚨') ||
@@ -427,34 +301,68 @@ async function connectToWhatsApp() {
             textoMensagem.includes('🤖 *Como me usar') ||
             textoMensagem.includes('✅ Limite de')
           ) {
-            console.log('[WHATSAPP] Ignorando resposta do próprio Lumio ou mensagem de sistema.');
             continue;
           }
 
           console.log(`[WHATSAPP] Mensagem recebida de ${remoteJid}: "${textoMensagem || '[Áudio]'}"`);
 
-          const textoNormalizado = textoMensagem.trim().toLowerCase();
-          const eLimite = textoNormalizado.includes('limite') || textoNormalizado.startsWith('/limite');
-          const eGasto =
-            textoNormalizado.includes('gastei') ||
-            textoNormalizado.includes('paguei') ||
-            textoNormalizado.includes('gasto') ||
-            textoNormalizado.includes('despesa') ||
-            textoNormalizado.includes('comprei') ||
-            textoNormalizado.includes('pagamento');
+          if (isAudio && isFromMe) {
+            console.log('[AUDIO] Processando mensagem de áudio...');
+            const buffer = await downloadMediaMessage(msg, 'buffer', {});
+            const textoTranscrito = await transcreverAudio(
+              buffer,
+              content.audioMessage.mimetype
+            );
+            if (textoTranscrito) {
+              console.log(`[AUDIO] Transcrição: "${textoTranscrito}"`);
+              const dadosGasto = await extrairGastos(textoTranscrito);
+              await registrarGasto(dadosGasto, remoteJid, msg);
+            }
+          } else if (
+            textoMensagem &&
+            (isFromMe ||
+              textoMensagem.toLowerCase().includes('gastei') ||
+              textoMensagem.toLowerCase().includes('paguei') ||
+              textoMensagem.toLowerCase().includes('limite'))
+          ) {
+            console.log(`🔍 Analisando intenção com Gemini: "${textoMensagem}"`);
+            const { intencao, valor, categoria } = await detectarIntencao(
+              textoMensagem
+            );
+            console.log(`🔍 Intenção detectada: ${intencao} | Valor: ${valor} | Categoria: ${categoria}`);
 
-          if (isAudio) {
-            await processarMensagemDeGasto(remoteJid, textoMensagem, msg, content);
-            continue;
-          }
-
-          if (eLimite && !eGasto) {
-            await processarMensagemDeLimite(remoteJid, textoMensagem, msg);
-            continue;
-          }
-
-          if (eGasto || textoMensagem) {
-            await processarMensagemDeGasto(remoteJid, textoMensagem, msg, content);
+            if (intencao === 'DEFINIR_LIMITE' && valor && categoria) {
+              await definirLimite(categoria, valor);
+              await sock.sendMessage(
+                remoteJid,
+                {
+                  text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${Number(
+                    valor
+                  ).toFixed(2)}* por mês.`,
+                },
+                { quoted: msg }
+              );
+            } else if (intencao === 'VER_LIMITES') {
+              const limites = await buscarTodosLimites();
+              await sock.sendMessage(
+                remoteJid,
+                { text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}` },
+                { quoted: msg }
+              );
+            } else if (intencao === 'REGISTRAR_GASTO') {
+              console.log(`[IA] Extraindo gasto da mensagem: "${textoMensagem}"`);
+              const dadosGasto = await extrairGastos(textoMensagem);
+              console.log(`[IA] Gasto extraído:`, dadosGasto);
+              await registrarGasto(dadosGasto, remoteJid, msg);
+            } else if (textoMensagem.startsWith('/ajuda')) {
+              const ajuda =
+                `🤖 *Como me usar:*\n\n` +
+                `1️⃣ *Registrar Gasto:* Basta falar natural, ex: "gastei 50 no bar" ou "paguei 100 de luz".\n\n` +
+                `2️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "quero gastar no máximo 500 em lazer".\n\n` +
+                `3️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
+                `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, assinaturas, lazer, compras, presentes, outros.`;
+              await sock.sendMessage(remoteJid, { text: ajuda }, { quoted: msg });
+            }
           }
         } catch (err) {
           console.error('[ERRO] Falha no processamento de mensagens:', err);

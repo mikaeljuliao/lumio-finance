@@ -1,3 +1,4 @@
+console.log(">>> Iniciando processo do backend do Lumio...");
 require('dotenv').config();
 const express = require('express');
 const http = require('http');

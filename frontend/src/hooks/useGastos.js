@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { calculateStats } from "../lib/utils";
 
-const API_BASE = "https://powerful-essence-production-0894.up.railway.app/";
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "https://powerful-essence-production-0894.up.railway.app"
+).replace(/\/$/, "");
 
 export function useGastos(filtroData) {
   const [gastos, setGastos] = useState([]);
@@ -10,25 +12,31 @@ export function useGastos(filtroData) {
   const fetchGastosELimites = useCallback(async () => {
     try {
       const [resGastos, resLimites] = await Promise.all([
-        fetch(`${API_BASE}api/gastos`),
-        fetch(`${API_BASE}api/limites`),
+        fetch(`${API_BASE}/api/gastos`),
+        fetch(`${API_BASE}/api/limites`),
       ]);
+
       if (resGastos.ok) {
         const dataGastos = await resGastos.json();
-        setGastos(
-          dataGastos.map((g) => ({
-            id: g.id,
-            valor: Number(g.valor),
-            categoria: g.categoria,
-            descricao: g.descricao,
-            data: g.data ? String(g.data).split("T")[0] : new Date().toISOString().split("T")[0],
-            created_at: g.criadoEm || new Date().toISOString(),
-          }))
-        );
+        if (Array.isArray(dataGastos)) {
+          setGastos(
+            dataGastos.map((g) => ({
+              id: g.id,
+              valor: Number(g.valor),
+              categoria: g.categoria,
+              descricao: g.descricao,
+              data: g.data ? String(g.data).split("T")[0] : new Date().toISOString().split("T")[0],
+              created_at: g.criadoEm || g.created_at || new Date().toISOString(),
+            }))
+          );
+        }
       }
+
       if (resLimites.ok) {
         const dataLimites = await resLimites.json();
-        setLimites(dataLimites);
+        if (dataLimites && typeof dataLimites === "object" && !Array.isArray(dataLimites)) {
+          setLimites(dataLimites);
+        }
       }
     } catch (err) {
       console.error("Erro ao buscar dados do backend:", err);
@@ -40,17 +48,21 @@ export function useGastos(filtroData) {
   }, [fetchGastosELimites]);
 
   const addGasto = useCallback((novoGasto) => {
-    setGastos((prev) => [
-      {
-        id: novoGasto.id,
-        valor: Number(novoGasto.valor),
-        categoria: novoGasto.categoria,
-        descricao: novoGasto.descricao,
-        data: novoGasto.data ? String(novoGasto.data).split("T")[0] : new Date().toISOString().split("T")[0],
-        created_at: novoGasto.created_at || new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+    const formatted = {
+      id: novoGasto.id,
+      valor: Number(novoGasto.valor),
+      categoria: novoGasto.categoria,
+      descricao: novoGasto.descricao,
+      data: novoGasto.data ? String(novoGasto.data).split("T")[0] : new Date().toISOString().split("T")[0],
+      created_at: novoGasto.created_at || novoGasto.criadoEm || new Date().toISOString(),
+    };
+
+    setGastos((prev) => {
+      if (prev.some((g) => g.id === formatted.id)) {
+        return prev;
+      }
+      return [formatted, ...prev];
+    });
   }, []);
 
   const updateGasto = useCallback((gastoAtualizado) => {
@@ -70,7 +82,7 @@ export function useGastos(filtroData) {
   const setLimite = useCallback(async (categoria, valor) => {
     try {
       setLimites((prev) => ({ ...prev, [categoria]: Number(valor) }));
-      await fetch(`${API_BASE}api/limites`, {
+      await fetch(`${API_BASE}/api/limites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoria, valor }),
@@ -87,7 +99,7 @@ export function useGastos(filtroData) {
         delete atualizados[categoria];
         return atualizados;
       });
-      await fetch(`${API_BASE}api/limites/${encodeURIComponent(categoria)}`, {
+      await fetch(`${API_BASE}/api/limites/${encodeURIComponent(categoria)}`, {
         method: "DELETE",
       });
     } catch (err) {
@@ -95,10 +107,27 @@ export function useGastos(filtroData) {
     }
   }, []);
 
+  const parseGastoYearMonth = (dataStr) => {
+    if (!dataStr) return { ano: null, mes: null };
+    const dateOnly = String(dataStr).split("T")[0];
+    const parts = dateOnly.split("-");
+    if (parts.length === 3) {
+      return {
+        ano: parseInt(parts[0], 10),
+        mes: parseInt(parts[1], 10) - 1,
+      };
+    }
+    const d = new Date(dataStr);
+    return {
+      ano: d.getFullYear(),
+      mes: d.getMonth(),
+    };
+  };
+
   const gastosFiltrados = useMemo(() => {
     return gastos.filter((g) => {
-      const d = new Date(g.data);
-      return d.getMonth() === filtroData.mes && d.getFullYear() === filtroData.ano;
+      const { ano, mes } = parseGastoYearMonth(g.data);
+      return mes === filtroData.mes && ano === filtroData.ano;
     });
   }, [gastos, filtroData]);
 
@@ -106,8 +135,8 @@ export function useGastos(filtroData) {
     const mesAnterior = filtroData.mes === 0 ? 11 : filtroData.mes - 1;
     const anoAnterior = filtroData.mes === 0 ? filtroData.ano - 1 : filtroData.ano;
     return gastos.filter((g) => {
-      const d = new Date(g.data);
-      return d.getMonth() === mesAnterior && d.getFullYear() === anoAnterior;
+      const { ano, mes } = parseGastoYearMonth(g.data);
+      return mes === mesAnterior && ano === anoAnterior;
     });
   }, [gastos, filtroData]);
 
@@ -129,3 +158,4 @@ export function useGastos(filtroData) {
     refetch: fetchGastosELimites,
   };
 }
+

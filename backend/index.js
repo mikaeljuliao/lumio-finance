@@ -48,6 +48,26 @@ let consecutive428Count = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const AUTH_FOLDER = path.join(__dirname, 'auth_info_baileys');
 
+// Set em escopo de módulo para rastrear IDs de mensagens enviadas pelo Lumio (evita loop/reprocessamento)
+const sentMessageIds = new Set();
+
+async function sendWhatsAppMessage(jid, content, options = {}) {
+  if (!sock) return null;
+  try {
+    const sentMsg = await sock.sendMessage(jid, content, options);
+    if (sentMsg?.key?.id) {
+      sentMessageIds.add(sentMsg.key.id);
+      setTimeout(() => {
+        sentMessageIds.delete(sentMsg.key.id);
+      }, 5 * 60 * 1000);
+    }
+    return sentMsg;
+  } catch (err) {
+    console.error('[WHATSAPP] Erro ao enviar mensagem:', err);
+    throw err;
+  }
+}
+
 // ─── REST API (PostgreSQL / Prisma) ──────────────────────────────────────────
 
 app.get('/api/gastos', async (req, res) => {
@@ -112,7 +132,7 @@ async function verificarENotificarLimites(valorGasto, categoriaGasto, remoteJid)
     for (const alerta of alertas) {
       if (sock) {
         console.log(`[LIMITES] Enviando alerta ao usuário no WhatsApp: ${alerta}`);
-        await sock.sendMessage(remoteJid, { text: alerta });
+        await sendWhatsAppMessage(remoteJid, { text: alerta });
       }
     }
   } catch (err) {
@@ -271,6 +291,13 @@ async function connectToWhatsApp() {
         try {
           if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
 
+          // Ignora mensagens cujo ID foi registrado ao ser enviado pelo próprio Lumio
+          if (msg.key.id && sentMessageIds.has(msg.key.id)) {
+            sentMessageIds.delete(msg.key.id);
+            console.log(`[WHATSAPP] Ignorando mensagem enviada pelo próprio Lumio (ID: ${msg.key.id})`);
+            continue;
+          }
+
           const getMessageContent = (m) => {
             if (m.viewOnceMessageV2?.message)
               return getMessageContent(m.viewOnceMessageV2.message);
@@ -283,30 +310,31 @@ async function connectToWhatsApp() {
 
           const content = getMessageContent(msg.message);
           const isAudio = !!content.audioMessage;
-          const textoMensagem =
+          const textoMensagem = (
             content.conversation ||
             content.extendedTextMessage?.text ||
             content.imageMessage?.caption ||
             content.videoMessage?.caption ||
-            '';
+            ''
+          ).trim();
           const remoteJid = msg.key.remoteJid;
-          const isFromMe = msg.key.fromMe;
 
-          // Ignorar mensagens de sistema enviadas pelo próprio bot
+          // Ignorar mensagens de resposta do próprio bot (filtro adicional por palavra-chave)
           if (
             textoMensagem.includes('✅ *Registrado:*') ||
+            textoMensagem.includes('✅ *Limite') ||
             textoMensagem.includes('🚨') ||
             textoMensagem.includes('🚩') ||
             textoMensagem.includes('📋 *Seus limites') ||
             textoMensagem.includes('🤖 *Como me usar') ||
-            textoMensagem.includes('✅ Limite de')
+            textoMensagem.includes('⚠️ *Atenção:')
           ) {
             continue;
           }
 
           console.log(`[WHATSAPP] Mensagem recebida de ${remoteJid}: "${textoMensagem || '[Áudio]'}"`);
 
-          if (isAudio && isFromMe) {
+          if (isAudio) {
             console.log('[AUDIO] Processando mensagem de áudio...');
             const buffer = await downloadMediaMessage(msg, 'buffer', {});
             const textoTranscrito = await transcreverAudio(
@@ -318,33 +346,42 @@ async function connectToWhatsApp() {
               const dadosGasto = await extrairGastos(textoTranscrito);
               await registrarGasto(dadosGasto, remoteJid, msg);
             }
-          } else if (
-            textoMensagem &&
-            (isFromMe ||
-              textoMensagem.toLowerCase().includes('gastei') ||
-              textoMensagem.toLowerCase().includes('paguei') ||
-              textoMensagem.toLowerCase().includes('limite'))
-          ) {
+          } else if (textoMensagem) {
+            if (textoMensagem.startsWith('/ajuda')) {
+              const ajuda =
+                `🤖 *Como me usar:*\n\n` +
+                `1️⃣ *Registrar Gasto:* Basta falar natural, ex: "gastei 50 no bar" ou "paguei 100 de luz".\n\n` +
+                `2️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "limite geral 2000".\n\n` +
+                `3️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
+                `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, assinaturas, lazer, compras, presentes, outros.`;
+              await sendWhatsAppMessage(remoteJid, { text: ajuda }, { quoted: msg });
+              continue;
+            }
+
             console.log(`🔍 Analisando intenção com Gemini: "${textoMensagem}"`);
-            const { intencao, valor, categoria } = await detectarIntencao(
-              textoMensagem
-            );
+            const { intencao, valor, categoria } = await detectarIntencao(textoMensagem);
             console.log(`🔍 Intenção detectada: ${intencao} | Valor: ${valor} | Categoria: ${categoria}`);
 
-            if (intencao === 'DEFINIR_LIMITE' && valor && categoria) {
-              await definirLimite(categoria, valor);
-              await sock.sendMessage(
+            if (intencao === 'DEFINIR_LIMITE' && valor) {
+              const catNorm = (categoria || '').toLowerCase().trim();
+              const catFinal = (!catNorm || catNorm === 'outros' || catNorm === 'geral')
+                ? (textoMensagem.toLowerCase().includes('outros') ? 'outros' : 'geral')
+                : catNorm;
+
+              await definirLimite(catFinal, valor);
+
+              const msgConfirmacao = catFinal === 'geral'
+                ? `✅ *Limite Geral Definido!*\n💰 Valor: *R$ ${Number(valor).toFixed(2)}* por mês.`
+                : `✅ *Limite por Categoria Definido!*\n📁 Categoria: *${catFinal}*\n💰 Valor: *R$ ${Number(valor).toFixed(2)}* por mês.`;
+
+              await sendWhatsAppMessage(
                 remoteJid,
-                {
-                  text: `✅ *Limite Definido!*\n📁 Categoria: *${categoria}*\n💰 Valor: *R$ ${Number(
-                    valor
-                  ).toFixed(2)}* por mês.`,
-                },
+                { text: msgConfirmacao },
                 { quoted: msg }
               );
             } else if (intencao === 'VER_LIMITES') {
               const limites = await buscarTodosLimites();
-              await sock.sendMessage(
+              await sendWhatsAppMessage(
                 remoteJid,
                 { text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}` },
                 { quoted: msg }
@@ -354,14 +391,6 @@ async function connectToWhatsApp() {
               const dadosGasto = await extrairGastos(textoMensagem);
               console.log(`[IA] Gasto extraído:`, dadosGasto);
               await registrarGasto(dadosGasto, remoteJid, msg);
-            } else if (textoMensagem.startsWith('/ajuda')) {
-              const ajuda =
-                `🤖 *Como me usar:*\n\n` +
-                `1️⃣ *Registrar Gasto:* Basta falar natural, ex: "gastei 50 no bar" ou "paguei 100 de luz".\n\n` +
-                `2️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "quero gastar no máximo 500 em lazer".\n\n` +
-                `3️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
-                `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, assinaturas, lazer, compras, presentes, outros.`;
-              await sock.sendMessage(remoteJid, { text: ajuda }, { quoted: msg });
             }
           }
         } catch (err) {
@@ -415,7 +444,7 @@ async function registrarGasto(dadosGasto, remoteJid, msg) {
 
     if (sock) {
       console.log(`[WHATSAPP] Enviando resposta de confirmação ao WhatsApp (${remoteJid})...`);
-      await sock.sendMessage(
+      await sendWhatsAppMessage(
         remoteJid,
         {
           text: `✅ *Registrado:* R$ ${Number(dadosGasto.valor).toFixed(2)}\n📝 ${

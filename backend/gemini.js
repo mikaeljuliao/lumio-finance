@@ -38,13 +38,18 @@ function categorizarLocalmente(texto) {
 
 const PROMPT_INTENCAO = `
 Você é um cérebro financeiro. Analise a mensagem do usuário.
-INTENÇÕES:
-1. "REGISTRAR_GASTO": Ex: "gastei 50 no bar"
-2. "DEFINIR_LIMITE": Ex: "limite de 500 em lazer"
-3. "VER_LIMITES": Ex: "quanto já gastei?"
+INTENÇÕES POSSÍVEIS:
+1. "REGISTRAR_GASTO": Ex: "gastei 50 no bar", "paguei 100 de luz"
+2. "DEFINIR_LIMITE": Ex: "limite de 500 em lazer", "meu limite geral é 2000", "definir limite 1500", "quero gastar no máximo 300 com mercado"
+3. "VER_LIMITES": Ex: "quais meus limites?", "ver limites", "quanto posso gastar?"
 
-Categorias: ${CATEGORIAS_LISTA.join(', ')}, geral.
-Retorne JSON: {"intencao": "string", "valor": num, "categoria": "string"}
+Categorias permitidas: ${CATEGORIAS_LISTA.join(', ')}, geral.
+
+REGRAS DE CATEGORIA PARA LIMITES:
+- Se o limite for para uma categoria específica da lista (ex: mercado, lazer, alimentação, educação), retorne essa categoria em minúsculas.
+- Se for um limite total/geral para a carteira inteira ou se não for informada uma categoria específica, retorne "geral".
+
+Retorne APENAS JSON no formato: {"intencao": "DEFINIR_LIMITE" | "REGISTRAR_GASTO" | "VER_LIMITES", "valor": number, "categoria": "string"}
 `;
 
 async function detectarIntencao(texto) {
@@ -57,8 +62,16 @@ async function detectarIntencao(texto) {
     return JSON.parse(text);
   } catch (e) {
     // Fallback local se a IA falhar
-    if (texto.toLowerCase().includes('limite') || texto.toLowerCase().includes('máximo')) {
-      return { intencao: 'DEFINIR_LIMITE', valor: parseFloat(texto.match(/\d+/)?.[0]) || 0, categoria: categorizarLocalmente(texto) };
+    const t = texto.toLowerCase();
+    if ((t.includes('quais') || t.includes('ver') || t.includes('consultar') || t.includes('meus')) && t.includes('limite')) {
+      return { intencao: 'VER_LIMITES' };
+    }
+    if (t.includes('limite') || t.includes('máximo') || t.includes('maximo')) {
+      const matchVal = texto.match(/(\d+(?:[.,]\d+)?)/);
+      const val = matchVal ? parseFloat(matchVal[1].replace(',', '.')) : 0;
+      const cat = categorizarLocalmente(texto);
+      const catFinal = (cat === 'outros' && !t.includes('outros')) ? 'geral' : cat;
+      return { intencao: 'DEFINIR_LIMITE', valor: val, categoria: catFinal };
     }
     return { intencao: 'REGISTRAR_GASTO' };
   }

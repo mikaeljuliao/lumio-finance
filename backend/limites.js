@@ -78,7 +78,10 @@ function formatarLimites(limites) {
   const entradas = Object.entries(limites);
   if (entradas.length === 0) return 'Nenhum limite definido.';
   return entradas
-    .map(([cat, val]) => `• *${cat}*: R$ ${Number(val).toFixed(2)}`)
+    .map(([cat, val]) => {
+      const label = cat === 'geral' ? 'Geral (Carteira)' : cat;
+      return `• *${label}*: R$ ${Number(val).toFixed(2)}`;
+    })
     .join('\n');
 }
 

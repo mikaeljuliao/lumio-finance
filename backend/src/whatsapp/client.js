@@ -23,11 +23,26 @@ let reconnectAttempts = 0;
 let consecutive428Count = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
+function clearAuthFolder() {
+  try {
+    if (fs.existsSync(AUTH_FOLDER)) {
+      fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+    }
+  } catch (e) {}
+}
+
+function scheduleReconnect(delayMs = 3000) {
+  if (reconnectTimeout) clearTimeout(reconnectTimeout);
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+  reconnectAttempts++;
+  reconnectTimeout = setTimeout(() => {
+    reconnectTimeout = null;
+    connectToWhatsApp();
+  }, delayMs);
+}
+
 async function connectToWhatsApp() {
-  if (isConnecting) {
-    console.log('[WHATSAPP] Connection already in progress, ignoring duplicate call.');
-    return;
-  }
+  if (isConnecting) return;
   isConnecting = true;
 
   if (reconnectTimeout) {
@@ -38,15 +53,12 @@ async function connectToWhatsApp() {
   try {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
     const { version } = await fetchLatestBaileysVersion();
-    console.log('[WHATSAPP] Baileys version:', version);
     const logger = pino({ level: 'error' });
 
     if (sock) {
       try {
         sock.ev.removeAllListeners();
-        if (sock.ws) {
-          sock.ws.close();
-        }
+        sock.ws?.close();
         sock.end(undefined);
       } catch (e) {}
       sock = null;
@@ -68,60 +80,53 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
-
-      if (connection === 'connecting') {
-        console.log('[WHATSAPP] STATUS: connecting — Connecting to Lumio WhatsApp...');
-      }
-
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         try {
-          console.log('[WHATSAPP] QR Code generated!');
           currentQR = await QRCode.toDataURL(qr);
           isConnected = false;
           isConnecting = false;
         } catch (err) {
-          console.error('[WHATSAPP] Error generating QR image:', err);
+          console.error('[WHATSAPP] Error generating QR:', err);
         }
+      }
+
+      if (connection === 'open') {
+        isConnecting = false;
+        isConnected = true;
+        reconnectAttempts = 0;
+        consecutive428Count = 0;
+        currentQR = null;
+        console.log('[WHATSAPP] ✅ Connected');
+        return;
       }
 
       if (connection === 'close') {
         isConnecting = false;
+        isConnected = false;
+        currentQR = null;
+
         const statusCode =
           lastDisconnect?.error?.output?.statusCode ||
           lastDisconnect?.error?.statusCode ||
           0;
-        console.log(`[WHATSAPP] Connection closed. Code: ${statusCode}`);
-
-        currentQR = null;
-        isConnected = false;
 
         const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
         const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
         const isConnectionClosed = statusCode === 428 || statusCode === DisconnectReason.connectionClosed;
 
         if (isLoggedOut) {
-          console.log('[WHATSAPP] Session logged out. Clearing credentials...');
           reconnectAttempts = 0;
           consecutive428Count = 0;
-          try {
-            if (fs.existsSync(AUTH_FOLDER)) {
-              fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-            }
-          } catch (e) {}
+          clearAuthFolder();
         } else if (isRestartRequired) {
           scheduleReconnect(1000);
         } else if (isConnectionClosed) {
           consecutive428Count++;
-          if (consecutive428Count >= 3 && !isConnected) {
+          if (consecutive428Count >= 3) {
             consecutive428Count = 0;
             reconnectAttempts = 0;
-            try {
-              if (fs.existsSync(AUTH_FOLDER)) {
-                fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-              }
-            } catch (e) {}
+            clearAuthFolder();
             scheduleReconnect(1000);
           } else {
             scheduleReconnect(3000);
@@ -129,57 +134,30 @@ async function connectToWhatsApp() {
         } else {
           scheduleReconnect(3000);
         }
-      } else if (connection === 'open') {
-        isConnecting = false;
-        reconnectAttempts = 0;
-        consecutive428Count = 0;
-        currentQR = null;
-        isConnected = true;
-        console.log('[WHATSAPP] ✅ WhatsApp Connected successfully!');
       }
     });
 
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    sock.ev.on('messages.upsert', async ({ messages }) => {
       for (const msg of messages) {
         try {
           if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
+          if (msg.key.fromMe) continue;
 
           if (msg.key.id && sentMessageIds.has(msg.key.id)) {
             sentMessageIds.delete(msg.key.id);
-            console.log(`[WHATSAPP] Ignoring bot message (ID: ${msg.key.id})`);
             continue;
           }
 
-          const remoteJid = msg.key.remoteJid;
-
-          if (msg.key.fromMe) {
-            continue;
-          }
-
-          await processMessage(msg, remoteJid, msg.key.participant || remoteJid, sock);
+          await processMessage(msg, msg.key.remoteJid, sock);
         } catch (err) {
-          console.error('[ERROR] Message processing failed:', err);
+          console.error('[WHATSAPP] Message processing error:', err);
         }
       }
     });
   } catch (err) {
     isConnecting = false;
-    console.error('[WHATSAPP] Error connecting to WhatsApp:', err);
+    console.error('[WHATSAPP] Connection error:', err);
   }
-}
-
-function scheduleReconnect(delayMs = 1000) {
-  if (reconnectTimeout) {
-    clearTimeout(reconnectTimeout);
-  }
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    return;
-  }
-  reconnectAttempts++;
-  reconnectTimeout = setTimeout(() => {
-    reconnectTimeout = null;
-    connectToWhatsApp();
-  }, delayMs);
 }
 
 module.exports = {

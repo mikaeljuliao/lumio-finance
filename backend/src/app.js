@@ -21,8 +21,7 @@ app.use(
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
-        console.warn(`[CORS] Origin blocked: ${origin}`);
-        callback(null, true);
+        callback(null, true); // permissive — restrict when a fixed domain is confirmed
       }
     },
     credentials: true,
@@ -31,7 +30,6 @@ app.use(
 
 app.use(express.json());
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/gastos', expenseRoutes);
 app.use('/api/limites', limitRoutes);

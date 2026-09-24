@@ -8,9 +8,9 @@ import { MONTH_NAMES } from "../lib/constants";
 import { Header } from "../components/Header";
 import { QrCodeBanner } from "../components/QrCodeBanner";
 import { OverviewBanner } from "../components/OverviewBanner";
-import { TransactionLedger } from "../components/TransactionLedger";
-import { CategoryHealth } from "../components/CategoryHealth";
 import { AnalyticsSection } from "../components/AnalyticsSection";
+import { CategoryHealth } from "../components/CategoryHealth";
+import { TransactionLedger } from "../components/TransactionLedger";
 
 import { AddTransactionModal } from "../components/modals/AddTransactionModal";
 import { EditTransactionModal } from "../components/modals/EditTransactionModal";
@@ -115,7 +115,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090B] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-16 antialiased">
+    <div className="min-h-screen bg-[#09090B] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20 antialiased overflow-x-hidden">
       {/* Navbar Header */}
       <Header
         filterDate={filterDate}
@@ -128,11 +128,11 @@ export default function Home() {
         onOpenAddModal={() => setIsAddModalOpen(true)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* QR Code Scan Section */}
         {!socketConnected && qrCode && <QrCodeBanner qrCode={qrCode} />}
 
-        {/* Hero Metrics Banner */}
+        {/* 1. Resumo Financeiro (Hero KPIs) */}
         <OverviewBanner
           stats={stats}
           limits={limites}
@@ -140,10 +140,13 @@ export default function Home() {
           onOpenLimitModal={handleOpenLimitModal}
         />
 
-        {/* 2-Column Responsive Dashboard Layout */}
+        {/* 2. Análises e Gráficos */}
+        <AnalyticsSection stats={stats} />
+
+        {/* 3. Seção Lado a Lado Responsiva (Extrato + Limites por Categoria) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Main Column: Transaction History (Col 7) */}
-          <div className="lg:col-span-7 space-y-8">
+          {/* Main Operational Ledger (Col 7 Desktop, Full Width Mobile) */}
+          <div className="lg:col-span-7">
             <TransactionLedger
               transactions={gastosFiltrados}
               monthName={MONTH_NAMES[filterDate.mes]}
@@ -167,15 +170,13 @@ export default function Home() {
             />
           </div>
 
-          {/* Secondary Column: Category Health & Visual Analytics (Col 5) */}
-          <div className="lg:col-span-5 space-y-8">
+          {/* Category Budget Health (Col 5 Desktop, Full Width Mobile) */}
+          <div className="lg:col-span-5">
             <CategoryHealth
               stats={stats}
               limits={limites}
               onOpenLimitModal={handleOpenLimitModal}
             />
-
-            <AnalyticsSection stats={stats} />
           </div>
         </div>
       </main>

@@ -1,21 +1,34 @@
-import { useState, useEffect } from "react";
-import { X, Edit3, Calendar, DollarSign, Tag, FileText } from "lucide-react";
+import { useState } from "react";
+import { X, Plus, Calendar, DollarSign, Tag, FileText } from "lucide-react";
 import { CATEGORIES } from "../../lib/constants";
 
-export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
-  const [formData, setFormData] = useState(gasto);
+export function AddTransactionModal({ isOpen, onClose, onSave }) {
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("alimentação");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
 
-  useEffect(() => {
-    setFormData(gasto);
-  }, [gasto]);
-
-  if (!isOpen || !formData) return null;
+  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (formData) {
-      onSave(formData);
-    }
+    const parsedAmount = parseFloat(amount);
+    if (!description.trim() || isNaN(parsedAmount) || parsedAmount <= 0) return;
+
+    onSave({
+      id: Date.now(),
+      descricao: description.trim(),
+      valor: parsedAmount,
+      categoria: category,
+      data: date,
+      created_at: new Date().toISOString()
+    });
+
+    setDescription("");
+    setAmount("");
+    setCategory("alimentação");
+    setDate(new Date().toISOString().split("T")[0]);
+    onClose();
   };
 
   return (
@@ -28,14 +41,14 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-3">
             <div className="bg-emerald-500/10 text-emerald-400 p-2.5 rounded-xl border border-emerald-500/20">
-              <Edit3 className="w-5 h-5" />
+              <Plus className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                Editar Lançamento
+                Novo Gasto
               </h3>
               <p className="text-xs text-zinc-400">
-                Ajuste os dados do gasto selecionado
+                Adicione um lançamento manualmente pelo site
               </p>
             </div>
           </div>
@@ -55,12 +68,12 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
             </label>
             <input
               type="text"
-              value={formData.descricao || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, descricao: e.target.value })
-              }
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ex: Almoço no restaurante, Uber, Mercado..."
               className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500/80 font-medium"
               required
+              autoFocus
             />
           </div>
 
@@ -74,13 +87,9 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
                 type="number"
                 step="0.01"
                 min="0.01"
-                value={formData.valor || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    valor: parseFloat(e.target.value) || 0
-                  })
-                }
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0,00"
                 className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500/80 font-bold"
                 required
               />
@@ -92,10 +101,8 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
               </label>
               <input
                 type="date"
-                value={formData.data ? String(formData.data).split("T")[0] : ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, data: e.target.value })
-                }
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/80 font-medium cursor-pointer"
                 required
               />
@@ -112,9 +119,9 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, categoria: cat.id })}
+                  onClick={() => setCategory(cat.id)}
                   className={`p-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
-                    formData.categoria === cat.id
+                    category === cat.id
                       ? "bg-emerald-500/20 border-emerald-500 text-emerald-300"
                       : "bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200"
                   }`}
@@ -138,7 +145,7 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
               type="submit"
               className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/15"
             >
-              Atualizar
+              Salvar Gasto
             </button>
           </div>
         </form>

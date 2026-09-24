@@ -69,6 +69,7 @@ export default function Home() {
 
   useEffect(() => {
     if (error === "SESSION_EXPIRED") {
+      clearSessionToken();
       setUser(null);
     }
   }, [error]);

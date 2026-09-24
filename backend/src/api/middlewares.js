@@ -19,7 +19,7 @@ function parseCookies(cookieHeader) {
 async function requireAuth(req, res, next) {
   try {
     const cookies = parseCookies(req.headers.cookie);
-    const token = cookies.lumio_session || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || cookies.lumio_session;
 
     if (!token) {
       return res.status(401).json({ error: 'Unauthenticated. Please log in.' });

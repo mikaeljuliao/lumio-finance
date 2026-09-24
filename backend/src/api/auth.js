@@ -47,7 +47,7 @@ router.get('/me', requireAuth, (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const cookies = parseCookies(req.headers.cookie);
-    const token = cookies.lumio_session || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || cookies.lumio_session;
     if (token) {
       await invalidateSession(token);
     }

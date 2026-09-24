@@ -9,8 +9,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id         String   @id @default(uuid())
+  whatsappId String   @unique
+  criadoEm   DateTime @default(now())
+
+  gastos      Gasto[]
+  limites     Limite[]
+  sessions    Session[]
+  loginStates WebLoginState[]
+}
+
 model Gasto {
   id        Int      @id @default(autoincrement())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   valor     Decimal  @db.Decimal(10, 2)
   categoria String
   descricao String
@@ -20,7 +33,31 @@ model Gasto {
 
 model Limite {
   id           Int      @id @default(autoincrement())
-  categoria    String   @unique
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoria    String
   valor        Decimal  @db.Decimal(10, 2)
   atualizadoEm DateTime @updatedAt
+
+  @@unique([userId, categoria])
+}
+
+model Session {
+  id       String   @id @default(uuid())
+  token    String   @unique
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiraEm DateTime
+  criadoEm DateTime @default(now())
+}
+
+model WebLoginState {
+  id       String   @id @default(uuid())
+  phone    String   @unique
+  token    String   @unique
+  status   String   @default("PENDING") // PENDING | VERIFIED | EXPIRED
+  userId   String?
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiraEm DateTime
+  criadoEm DateTime @default(now())
 }

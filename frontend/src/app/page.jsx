@@ -1,50 +1,98 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useGastos } from "../hooks/useGastos";
 import { useWhatsAppSocket } from "../hooks/useWhatsAppSocket";
 import { MONTH_NAMES } from "../lib/constants";
 
 import { Header } from "../components/Header";
-import { QrCodeBanner } from "../components/QrCodeBanner";
 import { OverviewBanner } from "../components/OverviewBanner";
 import { AnalyticsSection } from "../components/AnalyticsSection";
 import { CategoryHealth } from "../components/CategoryHealth";
 import { TransactionLedger } from "../components/TransactionLedger";
+import { LoginScreen } from "../components/auth/LoginScreen";
 
 import { AddTransactionModal } from "../components/modals/AddTransactionModal";
 import { EditTransactionModal } from "../components/modals/EditTransactionModal";
 import { LimitModal } from "../components/modals/LimitModal";
 import { ConfirmModal } from "../components/modals/ConfirmModal";
+import { Loader2 } from "lucide-react";
+import { getApiBaseUrl } from "../lib/config";
 
 export default function Home() {
+  const API_BASE = getApiBaseUrl();
+  const [user, setUser] = useState(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
   const [filterDate, setFilterDate] = useState({
     mes: new Date().getMonth(),
     ano: new Date().getFullYear()
   });
 
+  // Checar sessão do usuário no carregamento
+  const checkSession = useCallback(async () => {
+    setIsAuthChecking(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        credentials: "include"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      setUser(null);
+    } finally {
+      setIsAuthChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
   const {
+    gastos,
     gastosFiltrados,
     limites,
     stats,
     isLoading,
+    error,
     addGasto,
+    addGastoFromSocket,
     updateGasto,
     deleteGasto,
     clearGastos,
     setLimite,
     removeLimite
-  } = useGastos(filterDate);
+  } = useGastos(filterDate, Boolean(user));
 
-  const handleNewGasto = useCallback(
-    (novoGasto) => {
-      addGasto(novoGasto);
-    },
-    [addGasto]
-  );
+  // Real-time: adiciona gasto recebido via Socket.IO ao estado local
+  const handleNewGasto = useCallback((gasto) => {
+    addGastoFromSocket(gasto);
+  }, [addGastoFromSocket]);
 
-  const { socketConnected, qrCode, connectWhatsApp, disconnectWhatsApp } =
-    useWhatsAppSocket(handleNewGasto);
+  // Socket.IO: conecta e escuta eventos apenas quando o usuário estiver autenticado
+  useWhatsAppSocket(user ? handleNewGasto : null);
+
+  // Tratar expiração de sessão
+  useEffect(() => {
+    if (error === "SESSION_EXPIRED") {
+      setUser(null);
+    }
+  }, [error]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include"
+      });
+    } catch (e) {}
+    setUser(null);
+  };
 
   // Modal Controls
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -114,24 +162,34 @@ export default function Home() {
     setConfirmModalState({ isOpen: false, type: "delete", gastoId: undefined });
   };
 
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#09090B] text-zinc-100 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-emerald-400 font-bold text-sm">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Verificando sessão no Lumio...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen onLoginSuccess={(u) => setUser(u)} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#09090B] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20 antialiased overflow-x-hidden">
       {/* Navbar Header */}
       <Header
         filterDate={filterDate}
-        socketConnected={socketConnected}
-        qrCode={qrCode}
+        user={user}
         onPrevMonth={handlePrevMonth}
         onNextMonth={handleNextMonth}
-        onConnectWhatsApp={connectWhatsApp}
-        onDisconnectWhatsApp={disconnectWhatsApp}
         onOpenAddModal={() => setIsAddModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* QR Code Scan Section */}
-        {!socketConnected && qrCode && <QrCodeBanner qrCode={qrCode} />}
-
         {/* 1. Resumo Financeiro (Hero KPIs) */}
         <OverviewBanner
           stats={stats}

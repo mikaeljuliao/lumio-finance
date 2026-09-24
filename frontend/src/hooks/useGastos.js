@@ -1,24 +1,32 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { calculateStats } from "../lib/utils";
+import { getApiBaseUrl } from "../lib/config";
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "https://powerful-essence-production-0894.up.railway.app"
-).replace(/\/$/, "");
-
-export function useGastos(filtroData) {
+export function useGastos(filtroData, isAuthenticated = true) {
+  const API_BASE = getApiBaseUrl();
   const [gastos, setGastos] = useState([]);
   const [limites, setLimites] = useState({ geral: 2000 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchGastosELimites = useCallback(async () => {
+    if (!isAuthenticated) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
       const [resGastos, resLimites] = await Promise.all([
-        fetch(`${API_BASE}/api/gastos`),
-        fetch(`${API_BASE}/api/limites`),
+        fetch(`${API_BASE}/api/gastos`, { credentials: "include" }),
+        fetch(`${API_BASE}/api/limites`, { credentials: "include" }),
       ]);
+
+      if (resGastos.status === 401 || resLimites.status === 401) {
+        setError("SESSION_EXPIRED");
+        setIsLoading(false);
+        return;
+      }
 
       if (resGastos.ok) {
         const dataGastos = await resGastos.json();
@@ -44,55 +52,98 @@ export function useGastos(filtroData) {
       }
     } catch (err) {
       console.error("Erro ao buscar dados do backend:", err);
-      setError("Não foi possível carregar os dados. Conexão limitada.");
+      setError("Não foi possível carregar os dados.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchGastosELimites();
   }, [fetchGastosELimites]);
 
-  const addGasto = useCallback((novoGasto) => {
+  const addGasto = useCallback(async (novoGasto) => {
     const formatted = {
-      id: novoGasto.id || Date.now(),
       valor: Number(novoGasto.valor),
       categoria: novoGasto.categoria || "outros",
       descricao: novoGasto.descricao || "Sem descrição",
       data: novoGasto.data ? String(novoGasto.data).split("T")[0] : new Date().toISOString().split("T")[0],
-      created_at: novoGasto.created_at || novoGasto.criadoEm || new Date().toISOString(),
     };
 
-    setGastos((prev) => {
-      if (prev.some((g) => g.id === formatted.id)) {
-        return prev;
+    try {
+      const res = await fetch(`${API_BASE}/api/gastos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(formatted),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setGastos((prev) => {
+          if (prev.some((g) => g.id === created.id)) return prev;
+          return [created, ...prev];
+        });
       }
+    } catch (err) {
+      console.error("Erro ao salvar gasto no backend:", err);
+    }
+  }, []);
+
+  // Adiciona gasto recebido em tempo real via Socket.IO (já persistido no DB)
+  const addGastoFromSocket = useCallback((gasto) => {
+    const formatted = {
+      id: gasto.id,
+      valor: Number(gasto.valor),
+      categoria: gasto.categoria || "outros",
+      descricao: gasto.descricao || "Sem descrição",
+      data: gasto.data ? String(gasto.data).split("T")[0] : new Date().toISOString().split("T")[0],
+      created_at: gasto.created_at || new Date().toISOString(),
+    };
+    setGastos((prev) => {
+      if (prev.some((g) => g.id === formatted.id)) return prev;
       return [formatted, ...prev];
     });
   }, []);
 
-  const updateGasto = useCallback((gastoAtualizado) => {
+  const updateGasto = useCallback(async (gastoAtualizado) => {
     setGastos((prev) =>
-      prev.map((g) =>
-        g.id === gastoAtualizado.id
-          ? {
-              ...gastoAtualizado,
-              valor: Number(gastoAtualizado.valor),
-              data: String(gastoAtualizado.data).split("T")[0],
-            }
-          : g
-      )
+      prev.map((g) => (g.id === gastoAtualizado.id ? gastoAtualizado : g))
     );
+    try {
+      await fetch(`${API_BASE}/api/gastos/${gastoAtualizado.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(gastoAtualizado),
+      });
+    } catch (err) {
+      console.error("Erro ao atualizar gasto no backend:", err);
+    }
   }, []);
 
-  const deleteGasto = useCallback((id) => {
+  const deleteGasto = useCallback(async (id) => {
     setGastos((prev) => prev.filter((g) => g.id !== id));
+    try {
+      await fetch(`${API_BASE}/api/gastos/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch (err) {
+      console.error("Erro ao deletar gasto no backend:", err);
+    }
   }, []);
 
-  const clearGastos = useCallback(() => {
+  const clearGastos = useCallback(async () => {
     setGastos([]);
-  }, []);
+    try {
+      await fetch(`${API_BASE}/api/gastos?mes=${filtroData.mes + 1}&ano=${filtroData.ano}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch (err) {
+      console.error("Erro ao limpar gastos no backend:", err);
+    }
+  }, [filtroData]);
 
   const setLimite = useCallback(async (categoria, valor) => {
     const catClean = (categoria || "geral").toLowerCase().trim();
@@ -102,6 +153,7 @@ export function useGastos(filtroData) {
       await fetch(`${API_BASE}/api/limites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ categoria: catClean, valor: valNumber }),
       });
     } catch (err) {
@@ -119,6 +171,7 @@ export function useGastos(filtroData) {
       });
       await fetch(`${API_BASE}/api/limites/${encodeURIComponent(catClean)}`, {
         method: "DELETE",
+        credentials: "include",
       });
     } catch (err) {
       console.error("Erro ao remover limite no backend:", err);
@@ -170,6 +223,7 @@ export function useGastos(filtroData) {
     isLoading,
     error,
     addGasto,
+    addGastoFromSocket,
     updateGasto,
     deleteGasto,
     clearGastos,

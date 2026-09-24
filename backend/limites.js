@@ -1,26 +1,41 @@
 /**
- * limites.js — Operações de limites financeiros via Prisma.
+ * limites.js — Operações de limites financeiros via Prisma com isolamento por userId.
  */
 const prisma = require('./database');
 
-async function definirLimite(categoria, valor) {
+async function definirLimite(userId, categoria, valor) {
+  if (!userId) throw new Error('userId é obrigatório para definir limite');
   const cat = categoria.toLowerCase().trim();
+
   return await prisma.limite.upsert({
-    where: { categoria: cat },
+    where: {
+      userId_categoria: {
+        userId,
+        categoria: cat,
+      },
+    },
     update: { valor: Number(valor) },
-    create: { categoria: cat, valor: Number(valor) },
+    create: {
+      userId,
+      categoria: cat,
+      valor: Number(valor),
+    },
   });
 }
 
-async function removerLimite(categoria) {
+async function removerLimite(userId, categoria) {
+  if (!userId) return { count: 0 };
   const cat = categoria.toLowerCase().trim();
   return await prisma.limite.deleteMany({
-    where: { categoria: cat },
+    where: { userId, categoria: cat },
   });
 }
 
-async function buscarTodosLimites() {
-  const registros = await prisma.limite.findMany();
+async function buscarTodosLimites(userId) {
+  if (!userId) return {};
+  const registros = await prisma.limite.findMany({
+    where: { userId },
+  });
   const mapa = {};
   for (const item of registros) {
     mapa[item.categoria] = Number(item.valor);
@@ -28,14 +43,16 @@ async function buscarTodosLimites() {
   return mapa;
 }
 
-async function verificarLimites(valorGasto, categoriaGasto, mes, ano) {
+async function verificarLimites(userId, valorGasto, categoriaGasto, mes, ano) {
+  if (!userId) return [];
   const inicioMes = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
   const fimMes = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
 
   const [limites, gastosDoMes] = await Promise.all([
-    buscarTodosLimites(),
+    buscarTodosLimites(userId),
     prisma.gasto.findMany({
       where: {
+        userId,
         data: {
           gte: inicioMes,
           lte: fimMes,

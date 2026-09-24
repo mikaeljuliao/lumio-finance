@@ -20,7 +20,14 @@ const path = require('path');
 
 const { extrairGastos, detectarIntencao } = require('./gemini');
 const { transcreverAudio } = require('./transcrever');
-const { salvarGasto, buscarTodosGastos } = require('./gastos');
+const {
+  salvarGasto,
+  buscarTodosGastos,
+  buscarGastosDoMes,
+  atualizarGasto,
+  deletarGasto,
+  limparGastosDoMes,
+} = require('./gastos');
 const {
   definirLimite,
   removerLimite,
@@ -28,14 +35,47 @@ const {
   verificarLimites,
   formatarLimites,
 } = require('./limites');
+const {
+  normalizeWhatsAppId,
+  findOrCreateUserByWhatsAppId,
+  migrateExistingDataToDefaultUser,
+} = require('./user');
+const {
+  loginWithPhone,
+  getSessionUser,
+  invalidateSession,
+} = require('./auth');
+const { parseCookies, requireAuth } = require('./authMiddleware');
 
 const app = express();
-app.use(cors());
+
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://powerful-essence-production-0894.up.railway.app',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin) || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: {
+    origin: '*',
+    credentials: true,
+  },
 });
 
 let sock = null;
@@ -68,18 +108,69 @@ async function sendWhatsAppMessage(jid, content, options = {}) {
   }
 }
 
-// ─── REST API (PostgreSQL / Prisma) ──────────────────────────────────────────
+// ─── AUTH REST API ─────────────────────────────────────────────────────────────
 
-app.get('/api/gastos', async (req, res) => {
+app.post('/api/auth/login-start', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: 'Telefone é obrigatório' });
+    }
+    const result = await loginWithPhone(phone);
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.setHeader(
+      'Set-Cookie',
+      `lumio_session=${result.sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${
+        30 * 24 * 60 * 60
+      }${isProduction ? '; Secure' : ''}`
+    );
+
+    res.json({
+      success: true,
+      user: result.user,
+    });
+  } catch (err) {
+    console.error('[AUTH] Erro ao realizar login:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({
+    user: {
+      id: req.user.id,
+      whatsappId: req.user.whatsappId,
+      criadoEm: req.user.criadoEm,
+    },
+  });
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const cookies = parseCookies(req.headers.cookie);
+    const token = cookies.lumio_session || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    if (token) {
+      await invalidateSession(token);
+    }
+    res.setHeader('Set-Cookie', 'lumio_session=; Path=/; HttpOnly; Max-Age=0');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao realizar logout' });
+  }
+});
+
+// ─── FINANCIAL REST API (ISOLADA POR USER_ID) ──────────────────────────────
+
+app.get('/api/gastos', requireAuth, async (req, res) => {
   try {
     const me = req.query.mes ? parseInt(req.query.mes) : null;
     const ano = req.query.ano ? parseInt(req.query.ano) : null;
     let gastos;
     if (me && ano) {
-      const { buscarGastosDoMes } = require('./gastos');
-      gastos = await buscarGastosDoMes(me, ano);
+      gastos = await buscarGastosDoMes(req.userId, me, ano);
     } else {
-      gastos = await buscarTodosGastos();
+      gastos = await buscarTodosGastos(req.userId);
     }
     res.json(gastos);
   } catch (err) {
@@ -88,9 +179,71 @@ app.get('/api/gastos', async (req, res) => {
   }
 });
 
-app.get('/api/limites', async (req, res) => {
+app.post('/api/gastos', requireAuth, async (req, res) => {
   try {
-    const limites = await buscarTodosLimites();
+    const { valor, categoria, descricao, data } = req.body;
+    if (!valor) {
+      return res.status(400).json({ error: 'Valor é obrigatório' });
+    }
+    const gasto = await salvarGasto(req.userId, { valor, categoria, descricao, data });
+
+    const payloadGasto = {
+      id: gasto.id,
+      valor: Number(gasto.valor),
+      categoria: gasto.categoria,
+      descricao: gasto.descricao,
+      data: gasto.data ? String(gasto.data).split('T')[0] : new Date().toISOString().split('T')[0],
+      created_at: gasto.criadoEm.toISOString(),
+    };
+
+    io.to(`user:${req.userId}`).emit('novo_gasto', payloadGasto);
+    res.json(payloadGasto);
+  } catch (err) {
+    console.error('[API] Erro ao criar gasto:', err);
+    res.status(500).json({ error: 'Erro ao criar gasto' });
+  }
+});
+
+app.put('/api/gastos/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { valor, categoria, descricao, data } = req.body;
+    await atualizarGasto(req.userId, id, { valor, categoria, descricao, data });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] Erro ao atualizar gasto:', err);
+    res.status(500).json({ error: 'Erro ao atualizar gasto' });
+  }
+});
+
+app.delete('/api/gastos/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await deletarGasto(req.userId, id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] Erro ao deletar gasto:', err);
+    res.status(500).json({ error: 'Erro ao deletar gasto' });
+  }
+});
+
+app.delete('/api/gastos', requireAuth, async (req, res) => {
+  try {
+    const me = req.query.mes ? parseInt(req.query.mes) : null;
+    const ano = req.query.ano ? parseInt(req.query.ano) : null;
+    if (me && ano) {
+      await limparGastosDoMes(req.userId, me, ano);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] Erro ao limpar gastos:', err);
+    res.status(500).json({ error: 'Erro ao limpar gastos' });
+  }
+});
+
+app.get('/api/limites', requireAuth, async (req, res) => {
+  try {
+    const limites = await buscarTodosLimites(req.userId);
     res.json(limites);
   } catch (err) {
     console.error('[API] Erro ao buscar limites:', err);
@@ -98,10 +251,10 @@ app.get('/api/limites', async (req, res) => {
   }
 });
 
-app.post('/api/limites', async (req, res) => {
+app.post('/api/limites', requireAuth, async (req, res) => {
   try {
     const { categoria, valor } = req.body;
-    const limite = await definirLimite(categoria, valor);
+    const limite = await definirLimite(req.userId, categoria, valor);
     res.json(limite);
   } catch (err) {
     console.error('[API] Erro ao definir limite:', err);
@@ -109,10 +262,10 @@ app.post('/api/limites', async (req, res) => {
   }
 });
 
-app.delete('/api/limites/:categoria', async (req, res) => {
+app.delete('/api/limites/:categoria', requireAuth, async (req, res) => {
   try {
     const { categoria } = req.params;
-    await removerLimite(categoria);
+    await removerLimite(req.userId, categoria);
     res.json({ success: true });
   } catch (err) {
     console.error('[API] Erro ao remover limite:', err);
@@ -122,16 +275,16 @@ app.delete('/api/limites/:categoria', async (req, res) => {
 
 // ─── Verificação de Limites e Notificação ─────────────────────────────────────
 
-async function verificarENotificarLimites(valorGasto, categoriaGasto, remoteJid) {
+async function verificarENotificarLimites(userId, valorGasto, categoriaGasto, remoteJid) {
   try {
     const agora = new Date();
     const mes = agora.getMonth() + 1;
     const ano = agora.getFullYear();
-    console.log(`[LIMITES] Verificando limites para categoria "${categoriaGasto}" e valor R$ ${valorGasto}...`);
-    const alertas = await verificarLimites(valorGasto, categoriaGasto, mes, ano);
+    console.log(`[LIMITES] Verificando limites do usuário ${userId} para "${categoriaGasto}" (R$ ${valorGasto})...`);
+    const alertas = await verificarLimites(userId, valorGasto, categoriaGasto, mes, ano);
     for (const alerta of alertas) {
       if (sock) {
-        console.log(`[LIMITES] Enviando alerta ao usuário no WhatsApp: ${alerta}`);
+        console.log(`[LIMITES] Enviando alerta ao WhatsApp: ${alerta}`);
         await sendWhatsAppMessage(remoteJid, { text: alerta });
       }
     }
@@ -191,16 +344,15 @@ async function connectToWhatsApp() {
       const { connection, lastDisconnect, qr } = update;
 
       if (connection === 'connecting') {
-        console.log('[WHATSAPP] STATUS: connecting — QR possivelmente escaneado, aguardando autenticação...');
+        console.log('[WHATSAPP] STATUS: connecting — Conectando ao WhatsApp do Lumio...');
       }
 
       if (qr) {
         try {
-          console.log('[WHATSAPP] Novo QR Code gerado com sucesso!');
+          console.log('[WHATSAPP] QR Code gerado para o número do Lumio!');
           currentQR = await QRCode.toDataURL(qr);
           isConnected = false;
           isConnecting = false;
-          io.emit('qr', currentQR);
         } catch (err) {
           console.error('[WHATSAPP] Erro ao gerar imagem QR:', err);
         }
@@ -212,15 +364,10 @@ async function connectToWhatsApp() {
           lastDisconnect?.error?.output?.statusCode ||
           lastDisconnect?.error?.statusCode ||
           0;
-        console.log(`[WHATSAPP] Conexão encerrada. Código: ${statusCode}`, {
-          errorMessage: lastDisconnect?.error?.message,
-          errorPayload: lastDisconnect?.error?.output?.payload,
-          errorDetails: lastDisconnect?.error,
-        });
+        console.log(`[WHATSAPP] Conexão encerrada. Código: ${statusCode}`);
 
         currentQR = null;
         isConnected = false;
-        io.emit('disconnected');
 
         const isLoggedOut =
           statusCode === DisconnectReason.loggedOut || statusCode === 401;
@@ -230,34 +377,19 @@ async function connectToWhatsApp() {
           statusCode === 428 || statusCode === DisconnectReason.connectionClosed;
 
         if (isLoggedOut) {
-          console.log(
-            '[WHATSAPP] Sessão encerrada (logged out). Limpando credenciais...'
-          );
+          console.log('[WHATSAPP] Sessão encerrada (logged out). Limpando credenciais...');
           reconnectAttempts = 0;
           consecutive428Count = 0;
           try {
             if (fs.existsSync(AUTH_FOLDER)) {
               fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
             }
-          } catch (e) {
-            console.error('[WHATSAPP] Erro ao limpar credenciais:', e);
-          }
+          } catch (e) {}
         } else if (isRestartRequired) {
-          console.log(
-            '[WHATSAPP] Reinicialização solicitada pelo WhatsApp. Reutilizando sessão...'
-          );
-          consecutive428Count = 0;
           scheduleReconnect(1000);
         } else if (isConnectionClosed) {
           consecutive428Count++;
-          console.log(
-            `[WHATSAPP] Conexão fechada pelo servidor WhatsApp (428). Tentativa ${consecutive428Count}...`
-          );
-
           if (consecutive428Count >= 3 && !isConnected) {
-            console.log(
-              '[WHATSAPP] Sessão armazenada foi invalidada pelo servidor (428 repetido). Resetando sessão para novo QR Code...'
-            );
             consecutive428Count = 0;
             reconnectAttempts = 0;
             try {
@@ -270,9 +402,6 @@ async function connectToWhatsApp() {
             scheduleReconnect(3000);
           }
         } else {
-          console.log(
-            `[WHATSAPP] Desconexão temporária (código ${statusCode}). Tentando reconectar...`
-          );
           scheduleReconnect(3000);
         }
       } else if (connection === 'open') {
@@ -281,8 +410,7 @@ async function connectToWhatsApp() {
         consecutive428Count = 0;
         currentQR = null;
         isConnected = true;
-        console.log('[WHATSAPP] Conectado!');
-        io.emit('connected');
+        console.log('[WHATSAPP] ✅ WhatsApp central do Lumio Conectado com sucesso!');
       }
     });
 
@@ -291,12 +419,29 @@ async function connectToWhatsApp() {
         try {
           if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
 
-          // Ignora mensagens cujo ID foi registrado ao ser enviado pelo próprio Lumio
+          // Ignora mensagens enviadas pelo próprio Lumio
           if (msg.key.id && sentMessageIds.has(msg.key.id)) {
             sentMessageIds.delete(msg.key.id);
-            console.log(`[WHATSAPP] Ignorando mensagem enviada pelo próprio Lumio (ID: ${msg.key.id})`);
+            console.log(`[WHATSAPP] Ignorando mensagem do bot (ID: ${msg.key.id})`);
             continue;
           }
+
+          const remoteJid = msg.key.remoteJid;
+          const whatsappId = normalizeWhatsAppId(remoteJid);
+
+          // Ignorar mensagens de grupo (@g.us) ou sem ID válido
+          if (!whatsappId) {
+            continue;
+          }
+
+          // O Lumio atua como um bot receptivo. Ignora QUALQUER mensagem que o próprio celular enviar.
+          if (msg.key.fromMe) {
+            continue;
+          }
+
+          // Identificar ou Criar o Usuário no Banco de Dados pelo WhatsApp ID
+          const user = await findOrCreateUserByWhatsAppId(remoteJid);
+          if (!user) continue;
 
           const getMessageContent = (m) => {
             if (m.viewOnceMessageV2?.message)
@@ -317,9 +462,8 @@ async function connectToWhatsApp() {
             content.videoMessage?.caption ||
             ''
           ).trim();
-          const remoteJid = msg.key.remoteJid;
 
-          // Ignorar mensagens de resposta do próprio bot (filtro adicional por palavra-chave)
+          // Ignorar mensagens de resposta do próprio bot (filtro adicional)
           if (
             textoMensagem.includes('✅ *Registrado:*') ||
             textoMensagem.includes('✅ *Limite') ||
@@ -332,10 +476,10 @@ async function connectToWhatsApp() {
             continue;
           }
 
-          console.log(`[WHATSAPP] Mensagem recebida de ${remoteJid}: "${textoMensagem || '[Áudio]'}"`);
+          console.log(`[WHATSAPP] Mensagem do User ID ${user.id} (${whatsappId}): "${textoMensagem || '[Áudio]'}"`);
 
           if (isAudio) {
-            console.log('[AUDIO] Processando mensagem de áudio...');
+            console.log('[AUDIO] Transcrevendo áudio...');
             const buffer = await downloadMediaMessage(msg, 'buffer', {});
             const textoTranscrito = await transcreverAudio(
               buffer,
@@ -344,7 +488,7 @@ async function connectToWhatsApp() {
             if (textoTranscrito) {
               console.log(`[AUDIO] Transcrição: "${textoTranscrito}"`);
               const dadosGasto = await extrairGastos(textoTranscrito);
-              await registrarGasto(dadosGasto, remoteJid, msg);
+              await registrarGasto(user.id, dadosGasto, remoteJid, msg);
             }
           } else if (textoMensagem) {
             if (textoMensagem.startsWith('/ajuda')) {
@@ -360,7 +504,6 @@ async function connectToWhatsApp() {
 
             console.log(`🔍 Analisando intenção com Gemini: "${textoMensagem}"`);
             const { intencao, valor, categoria } = await detectarIntencao(textoMensagem);
-            console.log(`🔍 Intenção detectada: ${intencao} | Valor: ${valor} | Categoria: ${categoria}`);
 
             if (intencao === 'DEFINIR_LIMITE' && valor) {
               const catNorm = (categoria || '').toLowerCase().trim();
@@ -368,7 +511,7 @@ async function connectToWhatsApp() {
                 ? (textoMensagem.toLowerCase().includes('outros') ? 'outros' : 'geral')
                 : catNorm;
 
-              await definirLimite(catFinal, valor);
+              await definirLimite(user.id, catFinal, valor);
 
               const msgConfirmacao = catFinal === 'geral'
                 ? `✅ *Limite Geral Definido!*\n💰 Valor: *R$ ${Number(valor).toFixed(2)}* por mês.`
@@ -380,7 +523,7 @@ async function connectToWhatsApp() {
                 { quoted: msg }
               );
             } else if (intencao === 'VER_LIMITES') {
-              const limites = await buscarTodosLimites();
+              const limites = await buscarTodosLimites(user.id);
               await sendWhatsAppMessage(
                 remoteJid,
                 { text: `📋 *Seus limites mensais:*\n\n${formatarLimites(limites)}` },
@@ -389,8 +532,7 @@ async function connectToWhatsApp() {
             } else if (intencao === 'REGISTRAR_GASTO') {
               console.log(`[IA] Extraindo gasto da mensagem: "${textoMensagem}"`);
               const dadosGasto = await extrairGastos(textoMensagem);
-              console.log(`[IA] Gasto extraído:`, dadosGasto);
-              await registrarGasto(dadosGasto, remoteJid, msg);
+              await registrarGasto(user.id, dadosGasto, remoteJid, msg);
             }
           }
         } catch (err) {
@@ -409,25 +551,21 @@ function scheduleReconnect(delayMs = 1000) {
     clearTimeout(reconnectTimeout);
   }
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.log(
-      '[WHATSAPP] Número máximo de tentativas de reconexão atingido.'
-    );
     return;
   }
   reconnectAttempts++;
-  console.log(`[WHATSAPP] Agendando reconexão (tentativa ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) em ${delayMs}ms...`);
   reconnectTimeout = setTimeout(() => {
     reconnectTimeout = null;
     connectToWhatsApp();
   }, delayMs);
 }
 
-async function registrarGasto(dadosGasto, remoteJid, msg) {
+async function registrarGasto(userId, dadosGasto, remoteJid, msg) {
   if (dadosGasto && dadosGasto.valor) {
-    console.log('[GASTO] Registrando gasto no PostgreSQL (Prisma):', dadosGasto);
+    console.log(`[GASTO] Registrando gasto no PostgreSQL para User ID ${userId}:`, dadosGasto);
     let gastoSalvo = null;
     try {
-      gastoSalvo = await salvarGasto(dadosGasto);
+      gastoSalvo = await salvarGasto(userId, dadosGasto);
       console.log(`[GASTO] ✅ Salvo com sucesso no PostgreSQL! ID: ${gastoSalvo.id}`);
     } catch (e) {
       console.error('[ERRO] Falha ao salvar gasto no banco de dados:', e);
@@ -438,9 +576,15 @@ async function registrarGasto(dadosGasto, remoteJid, msg) {
       valor: Number(dadosGasto.valor),
       categoria: dadosGasto.categoria,
       descricao: dadosGasto.descricao,
-      data: dadosGasto.data || new Date().toISOString().split('T')[0],
+      data: gastoSalvo?.data ? gastoSalvo.data.toISOString().split('T')[0] : (dadosGasto.data || new Date().toISOString().split('T')[0]),
       created_at: gastoSalvo?.criadoEm ? gastoSalvo.criadoEm.toISOString() : new Date().toISOString(),
     };
+
+    // Emitir atualização em tempo real para a Dashboard via Socket.IO
+    if (io && userId) {
+      console.log(`[SOCKET] 🚀 Transmitindo novo_gasto para a sala user:${userId}`);
+      io.to(`user:${userId}`).emit('novo_gasto', payloadGasto);
+    }
 
     if (sock) {
       console.log(`[WHATSAPP] Enviando resposta de confirmação ao WhatsApp (${remoteJid})...`);
@@ -454,62 +598,47 @@ async function registrarGasto(dadosGasto, remoteJid, msg) {
         { quoted: msg }
       );
       await verificarENotificarLimites(
+        userId,
         dadosGasto.valor,
         dadosGasto.categoria,
         remoteJid
       );
     }
-
-    console.log('[SOCKET] Emitindo evento "novo_gasto" para atualizar o dashboard frontend...');
-    io.emit('novo_gasto', payloadGasto);
   } else {
     console.warn('[GASTO] Dados de gasto inválidos ou sem valor:', dadosGasto);
   }
 }
 
-io.on('connection', (socket) => {
-  console.log('[SOCKET] Cliente conectado ao Socket.IO');
-  if (isConnected) {
-    socket.emit('connected');
-  } else if (currentQR) {
-    socket.emit('qr', currentQR);
-  } else {
-    socket.emit('disconnected');
+// ─── SOCKET.IO ISOLAMENTO DE SALAS POR USER ───────────────────────────────
+
+io.on('connection', async (socket) => {
+  console.log('[SOCKET] Cliente conectou ao Socket.IO');
+
+  let token = socket.handshake.auth?.token;
+  if (!token && socket.handshake.headers.cookie) {
+    const cookies = parseCookies(socket.handshake.headers.cookie);
+    token = cookies.lumio_session;
   }
 
-  socket.on('connect_whatsapp', () => {
-    console.log('[WHATSAPP] Solicitada conexão via frontend');
-    if (!isConnected && !isConnecting) {
-      connectToWhatsApp();
-    }
-  });
+  const user = await getSessionUser(token);
+  if (user) {
+    socket.userId = user.id;
+    socket.join(`user:${user.id}`);
+    console.log(`[SOCKET] ✅ Cliente autenticado e ingressado na sala user:${user.id}`);
+    socket.emit('connected', { userId: user.id, whatsappId: user.whatsappId });
+  } else {
+    socket.emit('unauthenticated');
+  }
 
-  socket.on('disconnect_whatsapp', async () => {
-    console.log('[WHATSAPP] Solicitada desconexão via frontend');
-    try {
-      if (sock) {
-        sock.ev.removeAllListeners();
-        await sock.logout();
-      }
-    } catch (err) {
-      console.error('[WHATSAPP] Erro ao desconectar:', err);
-    }
-    sock = null;
-    isConnected = false;
-    isConnecting = false;
-    currentQR = null;
-    try {
-      if (fs.existsSync(AUTH_FOLDER)) {
-        fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-      }
-    } catch (e) {}
-    io.emit('disconnected');
+  socket.on('disconnect', () => {
+    console.log('[SOCKET] Cliente desconectado');
   });
 });
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor rodando na porta ${PORT} no host 0.0.0.0`);
+  await migrateExistingDataToDefaultUser();
   connectToWhatsApp();
 });

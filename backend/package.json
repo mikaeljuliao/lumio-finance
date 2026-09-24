@@ -2,10 +2,10 @@
   "name": "lumio-backend",
   "version": "1.0.0",
   "description": "Backend do Lumio — WhatsApp + IA financeira",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
     "postinstall": "prisma generate"
   },
   "license": "ISC",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Wallet, Smartphone, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
-import { getApiBaseUrl } from "../../lib/config";
+import { getApiBaseUrl, saveSessionToken } from "../../lib/config";
 
 export function LoginScreen({ onLoginSuccess }) {
   const API_BASE = getApiBaseUrl();
@@ -29,6 +29,10 @@ export function LoginScreen({ onLoginSuccess }) {
 
       const data = await res.json();
       if (res.ok && data.user) {
+        // Salvar token no localStorage para uso como Bearer em todas as chamadas
+        if (data.token) {
+          saveSessionToken(data.token);
+        }
         onLoginSuccess(data.user);
       } else {
         setError(data.error || "Erro ao acessar a conta");

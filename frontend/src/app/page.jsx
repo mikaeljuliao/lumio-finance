@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useGastos } from "../hooks/useGastos";
 import { useWhatsAppSocket } from "../hooks/useWhatsAppSocket";
 import { MONTH_NAMES } from "../lib/constants";
+import { getApiBaseUrl, authFetch, clearSessionToken } from "../lib/config";
 
 import { Header } from "../components/Header";
 import { OverviewBanner } from "../components/OverviewBanner";
@@ -17,7 +18,6 @@ import { EditTransactionModal } from "../components/modals/EditTransactionModal"
 import { LimitModal } from "../components/modals/LimitModal";
 import { ConfirmModal } from "../components/modals/ConfirmModal";
 import { Loader2 } from "lucide-react";
-import { getApiBaseUrl } from "../lib/config";
 
 export default function Home() {
   const API_BASE = getApiBaseUrl();
@@ -33,9 +33,7 @@ export default function Home() {
   const checkSession = useCallback(async () => {
     setIsAuthChecking(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/me`, {
-        credentials: "include"
-      });
+      const res = await authFetch(`${API_BASE}/api/auth/me`);
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -86,11 +84,9 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_BASE}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include"
-      });
+      await authFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
     } catch (e) {}
+    clearSessionToken();
     setUser(null);
   };
 

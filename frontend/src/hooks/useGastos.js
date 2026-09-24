@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { calculateStats } from "../lib/utils";
-import { getApiBaseUrl } from "../lib/config";
+import { getApiBaseUrl, authFetch } from "../lib/config";
 
 export function useGastos(filtroData, isAuthenticated = true) {
   const API_BASE = getApiBaseUrl();
@@ -18,8 +18,8 @@ export function useGastos(filtroData, isAuthenticated = true) {
     setError(null);
     try {
       const [resGastos, resLimites] = await Promise.all([
-        fetch(`${API_BASE}/api/gastos`, { credentials: "include" }),
-        fetch(`${API_BASE}/api/limites`, { credentials: "include" }),
+        authFetch(`${API_BASE}/api/gastos`),
+        authFetch(`${API_BASE}/api/limites`),
       ]);
 
       if (resGastos.status === 401 || resLimites.status === 401) {
@@ -71,10 +71,9 @@ export function useGastos(filtroData, isAuthenticated = true) {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/api/gastos`, {
+      const res = await authFetch(`${API_BASE}/api/gastos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(formatted),
       });
       if (res.ok) {
@@ -110,10 +109,9 @@ export function useGastos(filtroData, isAuthenticated = true) {
       prev.map((g) => (g.id === gastoAtualizado.id ? gastoAtualizado : g))
     );
     try {
-      await fetch(`${API_BASE}/api/gastos/${gastoAtualizado.id}`, {
+      await authFetch(`${API_BASE}/api/gastos/${gastoAtualizado.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(gastoAtualizado),
       });
     } catch (err) {
@@ -124,10 +122,7 @@ export function useGastos(filtroData, isAuthenticated = true) {
   const deleteGasto = useCallback(async (id) => {
     setGastos((prev) => prev.filter((g) => g.id !== id));
     try {
-      await fetch(`${API_BASE}/api/gastos/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      await authFetch(`${API_BASE}/api/gastos/${id}`, { method: "DELETE" });
     } catch (err) {
       console.error("Erro ao deletar gasto no backend:", err);
     }
@@ -136,9 +131,8 @@ export function useGastos(filtroData, isAuthenticated = true) {
   const clearGastos = useCallback(async () => {
     setGastos([]);
     try {
-      await fetch(`${API_BASE}/api/gastos?mes=${filtroData.mes + 1}&ano=${filtroData.ano}`, {
+      await authFetch(`${API_BASE}/api/gastos?mes=${filtroData.mes + 1}&ano=${filtroData.ano}`, {
         method: "DELETE",
-        credentials: "include",
       });
     } catch (err) {
       console.error("Erro ao limpar gastos no backend:", err);
@@ -150,10 +144,9 @@ export function useGastos(filtroData, isAuthenticated = true) {
     const valNumber = Number(valor) || 0;
     try {
       setLimites((prev) => ({ ...prev, [catClean]: valNumber }));
-      await fetch(`${API_BASE}/api/limites`, {
+      await authFetch(`${API_BASE}/api/limites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ categoria: catClean, valor: valNumber }),
       });
     } catch (err) {
@@ -169,9 +162,8 @@ export function useGastos(filtroData, isAuthenticated = true) {
         delete atualizados[catClean];
         return atualizados;
       });
-      await fetch(`${API_BASE}/api/limites/${encodeURIComponent(catClean)}`, {
+      await authFetch(`${API_BASE}/api/limites/${encodeURIComponent(catClean)}`, {
         method: "DELETE",
-        credentials: "include",
       });
     } catch (err) {
       console.error("Erro ao remover limite no backend:", err);

@@ -123,11 +123,10 @@ app.post('/api/auth/login-start', async (req, res) => {
     }
     const result = await loginWithPhone(phone);
 
-    const isProduction = process.env.NODE_ENV === 'production';
-    // Em producao: cross-origin exige SameSite=None + Secure obrigatoriamente
-    // Em desenvolvimento: SameSite=Lax funciona (mesmo dominio)
-    const sameSite = isProduction ? 'None' : 'Lax';
-    const securePart = isProduction ? '; Secure' : '';
+    // Tentar setar cookie (funciona quando frontend e backend estão no mesmo domínio)
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
+    const sameSite = isHttps ? 'None' : 'Lax';
+    const securePart = isHttps ? '; Secure' : '';
 
     res.setHeader(
       'Set-Cookie',
@@ -136,9 +135,11 @@ app.post('/api/auth/login-start', async (req, res) => {
       }${securePart}`
     );
 
+    // Também retornar o token no body para ambientes onde cookies cross-origin são bloqueados
     res.json({
       success: true,
       user: result.user,
+      token: result.sessionToken,
     });
   } catch (err) {
     console.error('[AUTH] Erro ao realizar login:', err.message);

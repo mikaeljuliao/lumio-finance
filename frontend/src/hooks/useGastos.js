@@ -8,8 +8,12 @@ const API_BASE = (
 export function useGastos(filtroData) {
   const [gastos, setGastos] = useState([]);
   const [limites, setLimites] = useState({ geral: 2000 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchGastosELimites = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const [resGastos, resLimites] = await Promise.all([
         fetch(`${API_BASE}/api/gastos`),
@@ -23,8 +27,8 @@ export function useGastos(filtroData) {
             dataGastos.map((g) => ({
               id: g.id,
               valor: Number(g.valor),
-              categoria: g.categoria,
-              descricao: g.descricao,
+              categoria: g.categoria || "outros",
+              descricao: g.descricao || "Sem descrição",
               data: g.data ? String(g.data).split("T")[0] : new Date().toISOString().split("T")[0],
               created_at: g.criadoEm || g.created_at || new Date().toISOString(),
             }))
@@ -40,6 +44,9 @@ export function useGastos(filtroData) {
       }
     } catch (err) {
       console.error("Erro ao buscar dados do backend:", err);
+      setError("Não foi possível carregar os dados. Conexão limitada.");
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -49,10 +56,10 @@ export function useGastos(filtroData) {
 
   const addGasto = useCallback((novoGasto) => {
     const formatted = {
-      id: novoGasto.id,
+      id: novoGasto.id || Date.now(),
       valor: Number(novoGasto.valor),
-      categoria: novoGasto.categoria,
-      descricao: novoGasto.descricao,
+      categoria: novoGasto.categoria || "outros",
+      descricao: novoGasto.descricao || "Sem descrição",
       data: novoGasto.data ? String(novoGasto.data).split("T")[0] : new Date().toISOString().split("T")[0],
       created_at: novoGasto.created_at || novoGasto.criadoEm || new Date().toISOString(),
     };
@@ -67,7 +74,15 @@ export function useGastos(filtroData) {
 
   const updateGasto = useCallback((gastoAtualizado) => {
     setGastos((prev) =>
-      prev.map((g) => (g.id === gastoAtualizado.id ? gastoAtualizado : g))
+      prev.map((g) =>
+        g.id === gastoAtualizado.id
+          ? {
+              ...gastoAtualizado,
+              valor: Number(gastoAtualizado.valor),
+              data: String(gastoAtualizado.data).split("T")[0],
+            }
+          : g
+      )
     );
   }, []);
 
@@ -80,12 +95,14 @@ export function useGastos(filtroData) {
   }, []);
 
   const setLimite = useCallback(async (categoria, valor) => {
+    const catClean = (categoria || "geral").toLowerCase().trim();
+    const valNumber = Number(valor) || 0;
     try {
-      setLimites((prev) => ({ ...prev, [categoria]: Number(valor) }));
+      setLimites((prev) => ({ ...prev, [catClean]: valNumber }));
       await fetch(`${API_BASE}/api/limites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria, valor }),
+        body: JSON.stringify({ categoria: catClean, valor: valNumber }),
       });
     } catch (err) {
       console.error("Erro ao definir limite no backend:", err);
@@ -93,13 +110,14 @@ export function useGastos(filtroData) {
   }, []);
 
   const removeLimite = useCallback(async (categoria) => {
+    const catClean = (categoria || "geral").toLowerCase().trim();
     try {
       setLimites((prev) => {
         const atualizados = { ...prev };
-        delete atualizados[categoria];
+        delete atualizados[catClean];
         return atualizados;
       });
-      await fetch(`${API_BASE}/api/limites/${encodeURIComponent(categoria)}`, {
+      await fetch(`${API_BASE}/api/limites/${encodeURIComponent(catClean)}`, {
         method: "DELETE",
       });
     } catch (err) {
@@ -149,6 +167,8 @@ export function useGastos(filtroData) {
     gastosFiltrados,
     limites,
     stats,
+    isLoading,
+    error,
     addGasto,
     updateGasto,
     deleteGasto,
@@ -158,4 +178,3 @@ export function useGastos(filtroData) {
     refetch: fetchGastosELimites,
   };
 }
-

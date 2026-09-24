@@ -13,32 +13,69 @@ export function getApiBaseUrl() {
   }
   return "https://powerful-essence-production-0894.up.railway.app";
 }
-
 const SESSION_KEY = "lumio_session_token";
+let memoryToken = null;
 
 /**
- * Salva o token de sessão no localStorage.
+ * Salva o token de sessão na memória, localStorage e cookies.
  */
 export function saveSessionToken(token) {
-  if (typeof window !== "undefined" && token) {
-    localStorage.setItem(SESSION_KEY, token);
+  if (!token) return;
+  memoryToken = token;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(SESSION_KEY, token);
+    } catch (e) {
+      console.warn("Could not save token to localStorage:", e);
+    }
+    try {
+      document.cookie = `${SESSION_KEY}=${encodeURIComponent(token)}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+    } catch (e) {}
   }
 }
 
 /**
- * Recupera o token de sessão do localStorage.
+ * Recupera o token de sessão de memory, localStorage ou cookies.
  */
 export function getSessionToken() {
+  if (memoryToken) return memoryToken;
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(SESSION_KEY) || null;
+
+  try {
+    const fromStorage = localStorage.getItem(SESSION_KEY);
+    if (fromStorage && fromStorage !== "null" && fromStorage !== "undefined") {
+      memoryToken = fromStorage;
+      return fromStorage;
+    }
+  } catch (e) {}
+
+  try {
+    const cookies = document.cookie.split(";");
+    for (let c of cookies) {
+      const [k, v] = c.trim().split("=");
+      if (k === SESSION_KEY && v && v !== "null" && v !== "undefined") {
+        const decoded = decodeURIComponent(v);
+        memoryToken = decoded;
+        return decoded;
+      }
+    }
+  } catch (e) {}
+
+  return null;
 }
 
 /**
- * Remove o token de sessão do localStorage.
+ * Remove o token de sessão da memória, localStorage e cookies.
  */
 export function clearSessionToken() {
+  memoryToken = null;
   if (typeof window !== "undefined") {
-    localStorage.removeItem(SESSION_KEY);
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (e) {}
+    try {
+      document.cookie = `${SESSION_KEY}=; path=/; max-age=0; SameSite=Lax`;
+    } catch (e) {}
   }
 }
 
@@ -59,11 +96,12 @@ export function getAuthHeaders(extra = {}) {
  */
 export function authFetch(url, options = {}) {
   const token = getSessionToken();
+  const baseHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   return fetch(url, {
     credentials: "include",
     ...options,
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...baseHeaders,
       ...(options.headers || {}),
     },
   });

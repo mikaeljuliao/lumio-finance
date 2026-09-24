@@ -19,9 +19,13 @@ function parseCookies(cookieHeader) {
 async function requireAuth(req, res, next) {
   try {
     const cookies = parseCookies(req.headers.cookie);
-    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || cookies.lumio_session;
+    let token = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
 
-    if (!token) {
+    if (!token || token === 'null' || token === 'undefined') {
+      token = cookies.lumio_session || cookies.lumio_session_token;
+    }
+
+    if (!token || token === 'null' || token === 'undefined') {
       return res.status(401).json({ error: 'Unauthenticated. Please log in.' });
     }
 

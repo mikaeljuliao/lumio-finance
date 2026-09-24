@@ -37,6 +37,7 @@ const {
 } = require('./limites');
 const {
   normalizeWhatsAppId,
+  resolveUserFromWhatsAppMessage,
   findOrCreateUserByWhatsAppId,
   migrateExistingDataToDefaultUser,
 } = require('./user');
@@ -439,9 +440,13 @@ async function connectToWhatsApp() {
             continue;
           }
 
-          // Identificar ou Criar o Usuário no Banco de Dados pelo WhatsApp ID
-          const user = await findOrCreateUserByWhatsAppId(remoteJid);
-          if (!user) continue;
+          // Identificar o Usuário no Banco de Dados pelo remoteJid (suporte a LID e PN)
+          // msg.key.remoteJidAlt contém o PN real quando a mensagem chegou como @lid
+          const user = await resolveUserFromWhatsAppMessage(remoteJid, msg.key.remoteJidAlt);
+          if (!user) {
+            console.warn(`[WHATSAPP] Usuário não identificado para remoteJid: ${remoteJid} (remoteJidAlt: ${msg.key.remoteJidAlt || 'N/A'}). Ignorando mensagem.`);
+            continue;
+          }
 
           const getMessageContent = (m) => {
             if (m.viewOnceMessageV2?.message)

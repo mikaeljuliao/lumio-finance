@@ -1,6 +1,3 @@
-/**
- * Configuração central de URLs de API do Frontend Lumio.
- */
 export function getApiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
@@ -13,30 +10,23 @@ export function getApiBaseUrl() {
   }
   return "https://powerful-essence-production-0894.up.railway.app";
 }
+
 const SESSION_KEY = "lumio_session_token";
 let memoryToken = null;
 
-/**
- * Salva o token de sessão na memória, localStorage e cookies.
- */
 export function saveSessionToken(token) {
   if (!token) return;
   memoryToken = token;
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(SESSION_KEY, token);
-    } catch (e) {
-      console.warn("Could not save token to localStorage:", e);
-    }
+    } catch (e) {}
     try {
       document.cookie = `${SESSION_KEY}=${encodeURIComponent(token)}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
     } catch (e) {}
   }
 }
 
-/**
- * Recupera o token de sessão de memory, localStorage ou cookies.
- */
 export function getSessionToken() {
   if (memoryToken) return memoryToken;
   if (typeof window === "undefined") return null;
@@ -64,9 +54,6 @@ export function getSessionToken() {
   return null;
 }
 
-/**
- * Remove o token de sessão da memória, localStorage e cookies.
- */
 export function clearSessionToken() {
   memoryToken = null;
   if (typeof window !== "undefined") {
@@ -79,9 +66,6 @@ export function clearSessionToken() {
   }
 }
 
-/**
- * Retorna os headers padrão com Authorization: Bearer quando o token existir.
- */
 export function getAuthHeaders(extra = {}) {
   const token = getSessionToken();
   return {
@@ -91,9 +75,6 @@ export function getAuthHeaders(extra = {}) {
   };
 }
 
-/**
- * Wrapper de fetch que sempre envia credentials e Authorization header.
- */
 export function authFetch(url, options = {}) {
   const token = getSessionToken();
   const baseHeaders = token ? { Authorization: `Bearer ${token}` } : {};

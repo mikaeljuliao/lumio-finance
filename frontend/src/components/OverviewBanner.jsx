@@ -39,8 +39,7 @@ export function OverviewBanner({
 
   return (
     <section className="bg-gradient-to-b from-zinc-900/90 to-zinc-950/80 border border-zinc-800/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 space-y-6 shadow-xl backdrop-blur-sm">
-      {/* Top Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-800/80">
+      <div className="flex items-center justify-between gap-3 pb-4 border-b border-zinc-800/80">
         <div className="flex items-center gap-2.5">
           <div className="bg-emerald-500/10 text-emerald-400 p-2 rounded-xl border border-emerald-500/20 shrink-0">
             <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -49,24 +48,20 @@ export function OverviewBanner({
             <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight">
               Resumo Financeiro do Mês
             </h2>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-zinc-400 hidden sm:block">
               Visão geral de saídas, saldo disponível e limites
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span
-            className={`px-3 py-1 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-wider ${status.color}`}
-          >
-            {status.label}
-          </span>
-        </div>
+        <span
+          className={`px-3 py-1 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 ${status.color}`}
+        >
+          {status.label}
+        </span>
       </div>
 
-      {/* KPI Cards Grid (4 Columns on Desktop, 2 on Mobile) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Card 1: Gasto no Mês */}
         <div className="bg-zinc-950/70 border border-zinc-800/80 p-4 sm:p-5 rounded-2xl space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
             <span>Gasto no Mês</span>
@@ -92,7 +87,6 @@ export function OverviewBanner({
           </div>
         </div>
 
-        {/* Card 2: Saldo Disponível */}
         <div className="bg-zinc-950/70 border border-zinc-800/80 p-4 sm:p-5 rounded-2xl space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
             <span>Saldo Disponível</span>
@@ -110,7 +104,6 @@ export function OverviewBanner({
           </p>
         </div>
 
-        {/* Card 3: Orçamento Mensal */}
         <div
           onClick={() => onOpenLimitModal("geral", monthlyBudget)}
           className="bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-emerald-500/40 p-4 sm:p-5 rounded-2xl space-y-2 cursor-pointer transition-all group"
@@ -127,7 +120,6 @@ export function OverviewBanner({
           </span>
         </div>
 
-        {/* Card 4: Média Diária & Registros */}
         <div className="bg-zinc-950/70 border border-zinc-800/80 p-4 sm:p-5 rounded-2xl space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
             <span>Média Diária</span>
@@ -142,7 +134,6 @@ export function OverviewBanner({
         </div>
       </div>
 
-      {/* Monthly Budget Gauge Progress Bar */}
       <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-4 space-y-2.5">
         <div className="flex items-center justify-between text-xs font-bold">
           <span className="text-zinc-300">

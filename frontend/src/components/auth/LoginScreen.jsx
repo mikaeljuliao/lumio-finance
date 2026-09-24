@@ -29,7 +29,6 @@ export function LoginScreen({ onLoginSuccess }) {
 
       const data = await res.json();
       if (res.ok && data.user) {
-        // Salvar token no localStorage para uso como Bearer em todas as chamadas
         if (data.token) {
           saveSessionToken(data.token);
         }
@@ -47,7 +46,6 @@ export function LoginScreen({ onLoginSuccess }) {
   return (
     <div className="min-h-screen bg-[#09090B] text-zinc-100 flex items-center justify-center p-4 selection:bg-emerald-500/30">
       <div className="w-full max-w-md bg-gradient-to-b from-zinc-900/90 to-zinc-950 border border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-8 backdrop-blur-md">
-        {/* Brand Header */}
         <div className="text-center space-y-3">
           <div className="w-14 h-14 bg-gradient-to-tr from-emerald-600 to-emerald-400 p-3 rounded-2xl mx-auto shadow-xl shadow-emerald-500/20 flex items-center justify-center">
             <Wallet className="w-8 h-8 text-zinc-950 font-bold" />
@@ -67,7 +65,6 @@ export function LoginScreen({ onLoginSuccess }) {
           </div>
         </div>
 
-        {/* Direct Login Form */}
         <form onSubmit={handleStartLogin} className="space-y-5">
           <div className="space-y-2">
             <label className="text-xs font-bold text-zinc-300 flex items-center gap-2">
@@ -109,7 +106,6 @@ export function LoginScreen({ onLoginSuccess }) {
           </button>
         </form>
 
-        {/* Security Footer */}
         <div className="pt-4 border-t border-zinc-800/80 text-center flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
           <span>Sessão segura e privada • Lumio Multi-User</span>

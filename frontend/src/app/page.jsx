@@ -7,6 +7,7 @@ import { MONTH_NAMES } from "../lib/constants";
 import { getApiBaseUrl, authFetch, clearSessionToken } from "../lib/config";
 
 import { Header } from "../components/Header";
+import { QuickActionBar } from "../components/QuickActionBar";
 import { OverviewBanner } from "../components/OverviewBanner";
 import { AnalyticsSection } from "../components/AnalyticsSection";
 import { CategoryHealth } from "../components/CategoryHealth";
@@ -17,6 +18,7 @@ import { AddTransactionModal } from "../components/modals/AddTransactionModal";
 import { EditTransactionModal } from "../components/modals/EditTransactionModal";
 import { LimitModal } from "../components/modals/LimitModal";
 import { ConfirmModal } from "../components/modals/ConfirmModal";
+import { WhatsAppModal } from "../components/modals/WhatsAppModal";
 import { Loader2 } from "lucide-react";
 
 export default function Home() {
@@ -82,8 +84,8 @@ export default function Home() {
     setUser(null);
   };
 
-  // Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [limitModalState, setLimitModalState] = useState({
     isOpen: false,
@@ -168,11 +170,15 @@ export default function Home() {
         user={user}
         onPrevMonth={handlePrevMonth}
         onNextMonth={handleNextMonth}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
         onLogout={handleLogout}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <QuickActionBar
+          onOpenAddModal={() => setIsAddModalOpen(true)}
+          onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+        />
+
         <OverviewBanner
           stats={stats}
           limits={limits}
@@ -248,6 +254,11 @@ export default function Home() {
           setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined })
         }
         onConfirm={handleConfirmAction}
+      />
+
+      <WhatsAppModal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
       />
     </div>
   );

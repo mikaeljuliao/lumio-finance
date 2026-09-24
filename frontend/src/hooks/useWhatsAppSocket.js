@@ -1,39 +1,44 @@
 import { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
-import { getApiBaseUrl } from "../lib/config";
+import { getApiBaseUrl, getSessionToken } from "../lib/config";
 
-export function useWhatsAppSocket(onNewGasto) {
-  const [socketConnected, setSocketConnected] = useState(false);
+export function useWhatsAppSocket(onNewExpense) {
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
   const socketRef = useRef(null);
+
   // Keep a ref to the latest callback to avoid reconnecting when it changes
-  const onNewGastoRef = useRef(onNewGasto);
+  const onNewExpenseRef = useRef(onNewExpense);
   useEffect(() => {
-    onNewGastoRef.current = onNewGasto;
-  }, [onNewGasto]);
+    onNewExpenseRef.current = onNewExpense;
+  }, [onNewExpense]);
 
   useEffect(() => {
     const socketUrl = getApiBaseUrl();
+    const token = getSessionToken();
+
     const socket = io(socketUrl, {
       withCredentials: true,
       transports: ["websocket", "polling"],
+      auth: { token },
     });
     socketRef.current = socket;
 
     socket.on("connected", () => {
-      setSocketConnected(true);
+      setIsSocketConnected(true);
     });
 
     socket.on("unauthenticated", () => {
-      setSocketConnected(false);
+      setIsSocketConnected(false);
     });
 
     socket.on("disconnect", () => {
-      setSocketConnected(false);
+      setIsSocketConnected(false);
     });
 
-    socket.on("novo_gasto", (gasto) => {
-      if (onNewGastoRef.current) {
-        onNewGastoRef.current(gasto);
+    // Backend emits "novo_gasto" — keeping this event name to not break the backend contract
+    socket.on("novo_gasto", (expense) => {
+      if (onNewExpenseRef.current) {
+        onNewExpenseRef.current(expense);
       }
     });
 
@@ -45,7 +50,5 @@ export function useWhatsAppSocket(onNewGasto) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return {
-    socketConnected,
-  };
+  return { isSocketConnected };
 }

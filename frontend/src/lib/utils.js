@@ -31,45 +31,41 @@ export function formatRelativeDate(dateString) {
   return formatDate(dateString);
 }
 
-export function calculateStats(gastosFiltrados, gastosMesAnterior) {
-  const total = gastosFiltrados.reduce((acc, g) => acc + Number(g.valor), 0);
-  const totalAnterior = gastosMesAnterior.reduce(
-    (acc, g) => acc + Number(g.valor),
-    0
-  );
-  const media = gastosFiltrados.length > 0 ? total / gastosFiltrados.length : 0;
-  const diff =
-    totalAnterior > 0 ? ((total - totalAnterior) / totalAnterior) * 100 : 0;
+export function calculateStats(filteredExpenses, previousMonthExpenses) {
+  const total = filteredExpenses.reduce((acc, g) => acc + Number(g.valor), 0);
+  const previousTotal = previousMonthExpenses.reduce((acc, g) => acc + Number(g.valor), 0);
+  const average = filteredExpenses.length > 0 ? total / filteredExpenses.length : 0;
+  const diff = previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : 0;
 
-  const porCategoria = gastosFiltrados.reduce((acc, g) => {
+  const byCategory = filteredExpenses.reduce((acc, g) => {
     const cat = g.categoria || "outros";
     acc[cat] = (acc[cat] || 0) + Number(g.valor);
     return acc;
   }, {});
 
-  const dataCategoria = Object.entries(porCategoria)
+  const categoryData = Object.entries(byCategory)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  const porData = gastosFiltrados.reduce((acc, g) => {
+  const byDate = filteredExpenses.reduce((acc, g) => {
     const dateOnly = String(g.data).split("T")[0];
     const [year, month, day] = dateOnly.split("-");
-    const dia = day ? `${day}/${month}` : new Date(g.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    acc[dia] = (acc[dia] || 0) + Number(g.valor);
+    const label = day ? `${day}/${month}` : new Date(g.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    acc[label] = (acc[label] || 0) + Number(g.valor);
     return acc;
   }, {});
 
-  const dataTimeline = Object.entries(porData)
+  const timelineData = Object.entries(byDate)
     .map(([name, total]) => ({ name, total }));
 
   return {
     total,
-    totalAnterior,
+    totalAnterior: previousTotal,
     diff,
-    media,
-    dataCategoria,
-    dataTimeline,
-    porCategoria
+    media: average,
+    dataCategoria: categoryData,
+    dataTimeline: timelineData,
+    porCategoria: byCategory,
   };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useGastos } from "../hooks/useGastos";
+import { useExpenses } from "../hooks/useExpenses";
 import { useWhatsAppSocket } from "../hooks/useWhatsAppSocket";
 import { MONTH_NAMES } from "../lib/constants";
 import { getApiBaseUrl, authFetch, clearSessionToken } from "../lib/config";
@@ -24,12 +24,11 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-  const [filterDate, setFilterDate] = useState({
+  const [dateFilter, setDateFilter] = useState({
     mes: new Date().getMonth(),
     ano: new Date().getFullYear()
   });
 
-  // Checar sessão do usuário no carregamento
   const checkSession = useCallback(async () => {
     setIsAuthChecking(true);
     try {
@@ -52,30 +51,22 @@ export default function Home() {
   }, [checkSession]);
 
   const {
-    gastos,
-    gastosFiltrados,
-    limites,
+    filteredExpenses,
+    limits,
     stats,
     isLoading,
     error,
-    addGasto,
-    addGastoFromSocket,
-    updateGasto,
-    deleteGasto,
-    clearGastos,
-    setLimite,
-    removeLimite
-  } = useGastos(filterDate, Boolean(user));
+    addExpense,
+    addExpenseFromSocket,
+    updateExpense,
+    deleteExpense,
+    clearExpenses,
+    setLimit,
+    removeLimit,
+  } = useExpenses(dateFilter, Boolean(user));
 
-  // Real-time: adiciona gasto recebido via Socket.IO ao estado local
-  const handleNewGasto = useCallback((gasto) => {
-    addGastoFromSocket(gasto);
-  }, [addGastoFromSocket]);
+  useWhatsAppSocket(user ? addExpenseFromSocket : null);
 
-  // Socket.IO: conecta e escuta eventos apenas quando o usuário estiver autenticado
-  useWhatsAppSocket(user ? handleNewGasto : null);
-
-  // Tratar expiração de sessão
   useEffect(() => {
     if (error === "SESSION_EXPIRED") {
       setUser(null);
@@ -90,9 +81,9 @@ export default function Home() {
     setUser(null);
   };
 
-  // Modal Controls
+  // Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingGasto, setEditingGasto] = useState(null);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [limitModalState, setLimitModalState] = useState({
     isOpen: false,
     categoria: "geral",
@@ -101,61 +92,57 @@ export default function Home() {
   const [confirmModalState, setConfirmModalState] = useState({
     isOpen: false,
     type: "delete",
-    gastoId: undefined
+    expenseId: undefined
   });
 
-  // Date Navigation
   const handlePrevMonth = () => {
-    setFilterDate((prev) => ({
+    setDateFilter((prev) => ({
       mes: prev.mes === 0 ? 11 : prev.mes - 1,
       ano: prev.mes === 0 ? prev.ano - 1 : prev.ano
     }));
   };
 
   const handleNextMonth = () => {
-    setFilterDate((prev) => ({
+    setDateFilter((prev) => ({
       mes: prev.mes === 11 ? 0 : prev.mes + 1,
       ano: prev.mes === 11 ? prev.ano + 1 : prev.ano
     }));
   };
 
-  // Limit Handlers
-  const handleOpenLimitModal = (categoria, valorAtual) => {
+  const handleOpenLimitModal = (categoria, currentValue) => {
     setLimitModalState({
       isOpen: true,
       categoria,
-      valor: valorAtual > 0 ? String(valorAtual) : ""
+      valor: currentValue > 0 ? String(currentValue) : ""
     });
   };
 
   const handleSaveLimit = (categoria, valor) => {
-    setLimite(categoria, valor);
+    setLimit(categoria, valor);
     setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
   };
 
   const handleRemoveLimit = (categoria) => {
-    removeLimite(categoria);
+    removeLimit(categoria);
     setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
   };
 
-  // Edit / Add Handlers
-  const handleSaveAdd = (novoGasto) => {
-    addGasto(novoGasto);
+  const handleSaveAdd = (newExpense) => {
+    addExpense(newExpense);
   };
 
-  const handleSaveEdit = (gastoAtualizado) => {
-    updateGasto(gastoAtualizado);
-    setEditingGasto(null);
+  const handleSaveEdit = (updatedExpense) => {
+    updateExpense(updatedExpense);
+    setEditingExpense(null);
   };
 
-  // Confirm Action Handler
   const handleConfirmAction = () => {
-    if (confirmModalState.type === "delete" && confirmModalState.gastoId) {
-      deleteGasto(confirmModalState.gastoId);
+    if (confirmModalState.type === "delete" && confirmModalState.expenseId) {
+      deleteExpense(confirmModalState.expenseId);
     } else if (confirmModalState.type === "clear") {
-      clearGastos();
+      clearExpenses();
     }
-    setConfirmModalState({ isOpen: false, type: "delete", gastoId: undefined });
+    setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined });
   };
 
   if (isAuthChecking) {
@@ -175,9 +162,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#09090B] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20 antialiased overflow-x-hidden">
-      {/* Navbar Header */}
       <Header
-        filterDate={filterDate}
+        filterDate={dateFilter}
         user={user}
         onPrevMonth={handlePrevMonth}
         onNextMonth={handleNextMonth}
@@ -186,56 +172,50 @@ export default function Home() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* 1. Resumo Financeiro (Hero KPIs) */}
         <OverviewBanner
           stats={stats}
-          limits={limites}
-          totalRecords={gastosFiltrados.length}
+          limits={limits}
+          totalRecords={filteredExpenses.length}
           onOpenLimitModal={handleOpenLimitModal}
         />
 
-        {/* 2. Análises e Gráficos */}
         <AnalyticsSection stats={stats} />
 
-        {/* 3. Seção Lado a Lado Responsiva (Extrato + Limites por Categoria) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Main Operational Ledger (Col 7 Desktop, Full Width Mobile) */}
           <div className="lg:col-span-7">
             <TransactionLedger
-              transactions={gastosFiltrados}
-              monthName={MONTH_NAMES[filterDate.mes]}
+              transactions={filteredExpenses}
+              monthName={MONTH_NAMES[dateFilter.mes]}
               isLoading={isLoading}
-              onEdit={(gasto) => setEditingGasto(gasto)}
-              onDelete={(gastoId) =>
+              onEdit={(expense) => setEditingExpense(expense)}
+              onDelete={(expenseId) =>
                 setConfirmModalState({
                   isOpen: true,
                   type: "delete",
-                  gastoId
+                  expenseId
                 })
               }
               onClearAll={() =>
                 setConfirmModalState({
                   isOpen: true,
                   type: "clear",
-                  gastoId: undefined
+                  expenseId: undefined
                 })
               }
               onOpenAddModal={() => setIsAddModalOpen(true)}
             />
           </div>
 
-          {/* Category Budget Health (Col 5 Desktop, Full Width Mobile) */}
           <div className="lg:col-span-5">
             <CategoryHealth
               stats={stats}
-              limits={limites}
+              limits={limits}
               onOpenLimitModal={handleOpenLimitModal}
             />
           </div>
         </div>
       </main>
 
-      {/* Modals */}
       <AddTransactionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -243,9 +223,9 @@ export default function Home() {
       />
 
       <EditTransactionModal
-        isOpen={Boolean(editingGasto)}
-        gasto={editingGasto}
-        onClose={() => setEditingGasto(null)}
+        isOpen={Boolean(editingExpense)}
+        gasto={editingExpense}
+        onClose={() => setEditingExpense(null)}
         onSave={handleSaveEdit}
       />
 
@@ -264,7 +244,7 @@ export default function Home() {
         isOpen={confirmModalState.isOpen}
         type={confirmModalState.type}
         onClose={() =>
-          setConfirmModalState({ isOpen: false, type: "delete", gastoId: undefined })
+          setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined })
         }
         onConfirm={handleConfirmAction}
       />

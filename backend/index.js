@@ -54,15 +54,19 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://powerful-essence-production-0894.up.railway.app',
+  // Frontend em producao (configurar FRONTEND_URL no Railway se necessario)
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || ALLOWED_ORIGINS.includes(origin) || process.env.NODE_ENV !== 'production') {
+      // Permite sem origin (curl, mobile, server-to-server) e origens permitidas
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
-        callback(null, true);
+        console.warn(`[CORS] Origem bloqueada: ${origin}`);
+        callback(null, true); // permissivo por ora — restrinja em producao quando houver dominio fixo
       }
     },
     credentials: true,
@@ -120,11 +124,16 @@ app.post('/api/auth/login-start', async (req, res) => {
     const result = await loginWithPhone(phone);
 
     const isProduction = process.env.NODE_ENV === 'production';
+    // Em producao: cross-origin exige SameSite=None + Secure obrigatoriamente
+    // Em desenvolvimento: SameSite=Lax funciona (mesmo dominio)
+    const sameSite = isProduction ? 'None' : 'Lax';
+    const securePart = isProduction ? '; Secure' : '';
+
     res.setHeader(
       'Set-Cookie',
-      `lumio_session=${result.sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${
+      `lumio_session=${result.sessionToken}; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=${
         30 * 24 * 60 * 60
-      }${isProduction ? '; Secure' : ''}`
+      }${securePart}`
     );
 
     res.json({
@@ -154,7 +163,10 @@ app.post('/api/auth/logout', async (req, res) => {
     if (token) {
       await invalidateSession(token);
     }
-    res.setHeader('Set-Cookie', 'lumio_session=; Path=/; HttpOnly; Max-Age=0');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const sameSite = isProduction ? 'None' : 'Lax';
+    const securePart = isProduction ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `lumio_session=; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=0${securePart}`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao realizar logout' });

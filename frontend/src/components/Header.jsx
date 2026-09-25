@@ -1,4 +1,5 @@
-import { Wallet, ChevronLeft, ChevronRight, LogOut, Smartphone } from "lucide-react";
+import Image from "next/image";
+import { ChevronLeft, ChevronRight, LogOut, Smartphone } from "lucide-react";
 import { MONTH_NAMES } from "../lib/constants";
 
 export function Header({
@@ -24,23 +25,15 @@ export function Header({
     <header className="sticky top-0 z-40 bg-[#09090B]/90 backdrop-blur-md border-b border-zinc-800/80 px-4 py-4 md:px-8 mb-8 transition-all">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-emerald-600 to-emerald-400 p-2.5 rounded-2xl shadow-lg shadow-emerald-500/20">
-              <Wallet className="w-5 h-5 text-zinc-950 font-bold" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black tracking-tight text-white uppercase italic">
-                  Lumio
-                </h1>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  Finance
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400 hidden sm:block">
-                Gestão Inteligente de Gastos
-              </p>
-            </div>
+          <div className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="Lumio"
+              width={100}
+              height={36}
+              style={{ filter: "invert(1)", objectFit: "contain" }}
+              priority
+            />
           </div>
         </div>
 

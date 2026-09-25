@@ -27,11 +27,10 @@ export function Header({
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
           <div className="flex items-center">
             <Image
-              src="/logo.png"
+              src="/logoWhite.png"
               alt="Lumio"
               width={100}
               height={36}
-              style={{ filter: "invert(1)", objectFit: "contain" }}
               priority
             />
           </div>

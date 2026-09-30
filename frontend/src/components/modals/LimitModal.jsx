@@ -39,7 +39,7 @@ export function LimitModal({
             </div>
             <div>
               <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                Definir Limite
+                {isGeneral ? "Definir Orçamento Mensal" : "Definir Limite"}
               </h3>
               <span className="text-xs font-bold text-emerald-400 capitalize">
                 {isGeneral ? "Orçamento Mensal" : categoria}

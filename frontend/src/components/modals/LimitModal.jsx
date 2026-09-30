@@ -39,10 +39,10 @@ export function LimitModal({
             </div>
             <div>
               <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                Definir Limite
+                {isGeneral ? "Definir Orçamento Mensal" : "Definir Limite"}
               </h3>
               <span className="text-xs font-bold text-emerald-400 capitalize">
-                {isGeneral ? "Geral (Carteira)" : categoria}
+                {isGeneral ? "Orçamento geral" : categoria}
               </span>
             </div>
           </div>
@@ -57,7 +57,7 @@ export function LimitModal({
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-zinc-300">
-              Valor Máximo Mensal (R$)
+              {isGeneral ? "Quanto você pretende gastar neste mês? (R$)" : "Valor Máximo Mensal (R$)"}
             </label>
             <input
               type="text"
@@ -89,7 +89,7 @@ export function LimitModal({
               type="submit"
               className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-3 rounded-xl transition-all text-xs uppercase tracking-wider"
             >
-              Salvar Limite
+              {isGeneral ? "Salvar Orçamento" : "Salvar Limite"}
             </button>
           </div>
         </form>

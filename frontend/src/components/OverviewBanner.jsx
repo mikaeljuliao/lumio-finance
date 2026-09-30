@@ -92,7 +92,7 @@ export function OverviewBanner({
 
         <div className="bg-zinc-950/70 border border-zinc-800/80 p-4 sm:p-5 rounded-2xl space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Saldo Disponível</span>
+            <span>Ainda Pode Gastar</span>
             <PiggyBank className={`w-3.5 h-3.5 ${isOverBudget ? "text-red-400" : "text-emerald-400"}`} />
           </span>
           <div

@@ -8,6 +8,7 @@ import { getApiBaseUrl, authFetch, clearSessionToken } from "../lib/config";
 
 import { Header } from "../components/Header";
 import { QuickActionBar } from "../components/QuickActionBar";
+import { OnboardingCard } from "../components/OnboardingCard";
 import { OverviewBanner } from "../components/OverviewBanner";
 import { AnalyticsSection } from "../components/AnalyticsSection";
 import { CategoryHealth } from "../components/CategoryHealth";
@@ -177,6 +178,17 @@ export default function Home() {
         <QuickActionBar
           onOpenAddModal={() => setIsAddModalOpen(true)}
           onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+        />
+
+        <OnboardingCard
+          user={user}
+          hasBudget={Object.prototype.hasOwnProperty.call(limits, "geral")}
+          hasExpense={filteredExpenses.length > 0}
+          onOpenBudget={() =>
+            handleOpenLimitModal("geral", limits.geral || "")
+          }
+          onOpenExpense={() => setIsAddModalOpen(true)}
+          onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
         />
 
         <OverviewBanner

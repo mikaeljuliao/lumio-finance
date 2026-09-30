@@ -62,7 +62,7 @@ export function OnboardingCard({
       id: "expense",
       icon: Plus,
       title: "Registre seu primeiro gasto",
-      description: "Ex.: "Gastei R$ 35 no almoço"",
+      description: 'Ex.: "Gastei R$ 35 no almoço"',
       action: "Adicionar gasto",
       onClick: () => onOpenExpense()
     },

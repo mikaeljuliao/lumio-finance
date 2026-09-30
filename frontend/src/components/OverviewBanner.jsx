@@ -32,7 +32,7 @@ export function OverviewBanner({
       };
     }
     return {
-      label: "Dentro do Orçamento",
+      label: hasBudget ? "Dentro do Orçamento" : "Defina seu orçamento",
       color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
       barColor: "bg-emerald-500"
     };
@@ -143,7 +143,7 @@ export function OverviewBanner({
             {hasBudget ? `Consumo do orçamento (${usedPercentage.toFixed(0)}%)` : "Orçamento mensal não definido"}
           </span>
           <span className="text-zinc-400">
-            {formatCurrency(totalSpent)} de {formatCurrency(monthlyBudget)}
+            {hasBudget ? `${formatCurrency(totalSpent)} de ${formatCurrency(monthlyBudget)}` : "Defina quanto pretende gastar neste mês"}
           </span>
         </div>
 

@@ -48,7 +48,7 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
               Limites por Categoria
             </h3>
             <p className="text-xs text-zinc-400">
-              Acompanhamento de metas por área
+              Controle do que você pretende gastar em cada categoria
             </p>
           </div>
         </div>
@@ -136,7 +136,7 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
                     {formatCurrency(cat.spent)}
                   </span>
                   <span className="text-xs text-zinc-400 font-medium shrink-0">
-                    {cat.hasLimit ? `Meta: ${formatCurrency(cat.limit)}` : ""}
+                    {cat.hasLimit ? `Limite: ${formatCurrency(cat.limit)}` : ""}
                   </span>
                 </div>
 

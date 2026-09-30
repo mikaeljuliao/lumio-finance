@@ -12,10 +12,11 @@ export function OnboardingCard({
   onOpenWhatsApp
 }) {
   const [completed, setCompleted] = useState({
-    budget: hasBudget,
-    expense: hasExpense,
+    budget: false,
+    expense: false,
     whatsapp: false
   });
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     const userKey = user?.id || user?.whatsappId;
@@ -29,17 +30,18 @@ export function OnboardingCard({
       expense: Boolean(saved.expense || hasExpense),
       whatsapp: Boolean(saved.whatsapp)
     });
+    setIsInitialized(true);
   }, [user, hasBudget, hasExpense]);
 
   useEffect(() => {
     const userKey = user?.id || user?.whatsappId;
-    if (!userKey) return;
+    if (!userKey || !isInitialized) return;
 
     localStorage.setItem(
       `${ONBOARDING_KEY}:${userKey}`,
       JSON.stringify(completed)
     );
-  }, [completed, user]);
+  }, [completed, user, isInitialized]);
 
   if (completed.budget && completed.expense && completed.whatsapp) {
     return null;

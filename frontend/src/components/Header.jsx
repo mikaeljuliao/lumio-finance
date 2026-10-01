@@ -7,7 +7,8 @@ export function Header({
   user,
   onPrevMonth,
   onNextMonth,
-  onLogout
+  onLogout,
+  onOpenHowItWorks
 }) {
   const formatUserPhone = (id) => {
     if (!id) return "";
@@ -61,7 +62,15 @@ export function Header({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-end flex-wrap">
+          <button
+            onClick={onOpenHowItWorks}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-200 transition-colors hover:border-emerald-500/30 hover:text-emerald-300"
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            Como funciona o Lumio
+          </button>
+
           {user && (
             <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-zinc-800 bg-zinc-900/80 text-zinc-300 text-xs font-bold" title="Sua conta conectada">
               <Smartphone className="w-3.5 h-3.5 text-emerald-400" />

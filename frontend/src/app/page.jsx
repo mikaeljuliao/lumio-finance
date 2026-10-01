@@ -19,6 +19,7 @@ import { EditTransactionModal } from "../components/modals/EditTransactionModal"
 import { LimitModal } from "../components/modals/LimitModal";
 import { ConfirmModal } from "../components/modals/ConfirmModal";
 import { WhatsAppModal } from "../components/modals/WhatsAppModal";
+import { HowItWorksModal } from "../components/modals/HowItWorksModal";
 import { Loader2 } from "lucide-react";
 
 export default function Home() {
@@ -86,6 +87,7 @@ export default function Home() {
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isHowItWorksModalOpen, setIsHowItWorksModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [limitModalState, setLimitModalState] = useState({
     isOpen: false,
@@ -171,12 +173,14 @@ export default function Home() {
         onPrevMonth={handlePrevMonth}
         onNextMonth={handleNextMonth}
         onLogout={handleLogout}
+        onOpenHowItWorks={() => setIsHowItWorksModalOpen(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <QuickActionBar
           onOpenAddModal={() => setIsAddModalOpen(true)}
           onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+          onOpenHowItWorks={() => setIsHowItWorksModalOpen(true)}
         />
 
         <OverviewBanner
@@ -254,6 +258,12 @@ export default function Home() {
           setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined })
         }
         onConfirm={handleConfirmAction}
+      />
+
+      <HowItWorksModal
+        isOpen={isHowItWorksModalOpen}
+        onClose={() => setIsHowItWorksModalOpen(false)}
+        onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
       />
 
       <WhatsAppModal

@@ -7,11 +7,14 @@ export function OverviewBanner({
   totalRecords,
   onOpenLimitModal
 }) {
-  const monthlyBudget = limits.geral || 2000;
+  const monthlyBudget = Number(limits.geral) || 0;
+  const hasBudget = monthlyBudget > 0;
   const totalSpent = stats.total || 0;
-  const remainingBudget = monthlyBudget - totalSpent;
-  const usedPercentage = Math.min((totalSpent / monthlyBudget) * 100, 100);
-  const isOverBudget = remainingBudget < 0;
+  const remainingBudget = hasBudget ? monthlyBudget - totalSpent : 0;
+  const usedPercentage = hasBudget
+    ? Math.min((totalSpent / monthlyBudget) * 100, 100)
+    : 0;
+  const isOverBudget = hasBudget && remainingBudget < 0;
 
   const getStatusBadge = () => {
     if (usedPercentage >= 100 || isOverBudget) {
@@ -29,7 +32,7 @@ export function OverviewBanner({
       };
     }
     return {
-      label: "Dentro do Orçamento",
+      label: hasBudget ? "Dentro do Orçamento" : "Defina seu orçamento",
       color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
       barColor: "bg-emerald-500"
     };
@@ -89,7 +92,7 @@ export function OverviewBanner({
 
         <div className="bg-zinc-950/70 border border-zinc-800/80 p-4 sm:p-5 rounded-2xl space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Saldo Disponível</span>
+            <span>Ainda Pode Gastar</span>
             <PiggyBank className={`w-3.5 h-3.5 ${isOverBudget ? "text-red-400" : "text-emerald-400"}`} />
           </span>
           <div
@@ -97,10 +100,14 @@ export function OverviewBanner({
               isOverBudget ? "text-red-400" : "text-emerald-400"
             }`}
           >
-            {formatCurrency(Math.abs(remainingBudget))}
+            {hasBudget ? formatCurrency(Math.abs(remainingBudget)) : "Não definido"}
           </div>
           <p className="text-[10px] sm:text-xs text-zinc-400">
-            {isOverBudget ? "Excedido no orçamento" : "Restante do orçamento"}
+            {isOverBudget
+              ? "Excedido no orçamento"
+              : hasBudget
+                ? "Ainda pode gastar"
+                : "Defina seu orçamento mensal"}
           </p>
         </div>
 
@@ -113,10 +120,10 @@ export function OverviewBanner({
             <Target className="w-3.5 h-3.5 text-zinc-400 group-hover:text-emerald-400" />
           </span>
           <div className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight truncate">
-            {formatCurrency(monthlyBudget)}
+            {hasBudget ? formatCurrency(monthlyBudget) : "Não definido"}
           </div>
           <span className="text-[10px] sm:text-xs text-emerald-400 font-bold block group-hover:underline">
-            Ajustar meta geral →
+            {hasBudget ? "Ajustar orçamento →" : "Definir orçamento →"}
           </span>
         </div>
 
@@ -137,10 +144,14 @@ export function OverviewBanner({
       <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-4 space-y-2.5">
         <div className="flex items-center justify-between text-xs font-bold">
           <span className="text-zinc-300">
-            Consumo do Orçamento Geral ({usedPercentage.toFixed(0)}%)
+            {hasBudget
+              ? `Consumo do orçamento (${usedPercentage.toFixed(0)}%)`
+              : "Orçamento mensal não definido"}
           </span>
           <span className="text-zinc-400">
-            {formatCurrency(totalSpent)} de {formatCurrency(monthlyBudget)}
+            {hasBudget
+              ? `${formatCurrency(totalSpent)} de ${formatCurrency(monthlyBudget)}`
+              : "Defina quanto pretende gastar neste mês"}
           </span>
         </div>
 

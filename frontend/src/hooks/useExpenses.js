@@ -5,7 +5,7 @@ import { getApiBaseUrl, authFetch } from "../lib/config";
 export function useExpenses(dateFilter, isAuthenticated = true) {
   const API_BASE = getApiBaseUrl();
   const [expenses, setExpenses] = useState([]);
-  const [limits, setLimits] = useState({ geral: 2000 });
+  const [limits, setLimits] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 

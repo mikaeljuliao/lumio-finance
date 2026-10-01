@@ -152,6 +152,7 @@ export function OverviewBanner({
             {hasBudget
               ? `${formatCurrency(totalSpent)} de ${formatCurrency(monthlyBudget)}`
               : "Defina quanto pretende gastar neste mês"}
+          </span>
         </div>
 
         <div className="w-full bg-zinc-900 h-3 rounded-full overflow-hidden p-0.5 border border-zinc-800">

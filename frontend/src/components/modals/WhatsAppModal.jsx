@@ -1,5 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
-import { MessageSquare, ExternalLink, X, Smartphone, Send } from "lucide-react";
+import { MessageSquare, ExternalLink, X, Smartphone, Send, Mic, Target } from "lucide-react";
 import { LUMIO_WHATSAPP } from "../../lib/constants";
 
 export function WhatsAppModal({ isOpen, onClose }) {
@@ -7,15 +7,12 @@ export function WhatsAppModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal Card */}
-      <div className="relative bg-[#0F0F12] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-5 text-center z-10 overflow-hidden">
-        {/* Close Button */}
+      <div className="relative bg-[#0F0F12] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 text-center z-10 overflow-hidden">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
@@ -24,7 +21,6 @@ export function WhatsAppModal({ isOpen, onClose }) {
           <X className="w-4 h-4" />
         </button>
 
-        {/* Icon & Title */}
         <div className="space-y-2">
           <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto">
             <MessageSquare className="w-6 h-6" />
@@ -38,7 +34,6 @@ export function WhatsAppModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Compact QR Code Container */}
         <div className="bg-zinc-950/80 border border-zinc-800 p-4 rounded-2xl space-y-2 flex flex-col items-center justify-center">
           <div className="bg-white p-2.5 rounded-xl shadow-md">
             <QRCodeSVG
@@ -54,18 +49,39 @@ export function WhatsAppModal({ isOpen, onClose }) {
           </p>
         </div>
 
-        {/* Tip Box */}
-        <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 text-left space-y-1 text-xs">
-          <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px] uppercase">
+        <div className="space-y-3 text-left">
+          <div className="flex items-center gap-2 text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
             <Send className="w-3 h-3" />
-            <span>Exemplo de envio:</span>
+            <span>Como funciona</span>
           </div>
-          <p className="text-zinc-300 font-mono text-[11px]">
-            &quot;gastei 35 no almoço&quot;
-          </p>
+
+          <div className="grid gap-2">
+            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-2.5">
+              <div className="flex items-center gap-2 text-zinc-200 text-[11px] font-bold mb-1">
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Gasto</span>
+              </div>
+              <p className="text-zinc-300 text-[11px] font-mono">&quot;gastei 35 no almoço&quot;</p>
+            </div>
+
+            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-2.5">
+              <div className="flex items-center gap-2 text-zinc-200 text-[11px] font-bold mb-1">
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Limite</span>
+              </div>
+              <p className="text-zinc-300 text-[11px] font-mono">&quot;meu limite de lazer é 600&quot;</p>
+            </div>
+
+            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-2.5">
+              <div className="flex items-center gap-2 text-zinc-200 text-[11px] font-bold mb-1">
+                <Mic className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Áudio</span>
+              </div>
+              <p className="text-zinc-300 text-[11px] font-mono">&quot;gastei 80 na gasolina&quot;</p>
+            </div>
+          </div>
         </div>
 
-        {/* Action Button */}
         <a
           href={LUMIO_WHATSAPP.link}
           target="_blank"

@@ -5,6 +5,7 @@ import { useGastos } from "../hooks/useGastos";
 import { useWhatsAppSocket } from "../hooks/useWhatsAppSocket";
 
 import { Header } from "../components/Header";
+import { ProductGuide } from "../components/ProductGuide";
 import { QrCodeSection } from "../components/QrCodeSection";
 import { StatsGrid } from "../components/StatsGrid";
 import { ChartsSection } from "../components/ChartsSection";
@@ -115,6 +116,8 @@ export default function Home() {
           onConnect={connectWhatsApp}
           onDisconnect={disconnectWhatsApp}
         />
+
+        <ProductGuide />
 
         {!socketConnected && qrCode && <QrCodeSection qrCode={qrCode} />}
 

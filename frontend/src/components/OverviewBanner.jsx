@@ -113,7 +113,16 @@ export function OverviewBanner({
 
         <div
           onClick={() => onOpenLimitModal("geral", monthlyBudget)}
-          className="bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-emerald-500/40 p-4 sm:p-5 rounded-2xl space-y-2 cursor-pointer transition-all group"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onOpenLimitModal("geral", monthlyBudget);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Editar orçamento mensal"
+          className="bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-emerald-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 p-4 sm:p-5 rounded-2xl space-y-2 cursor-pointer transition-all group"
         >
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between group-hover:text-emerald-400 transition-colors">
             <span>Orçamento Mensal</span>

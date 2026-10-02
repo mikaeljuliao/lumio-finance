@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Sliders, Trash2 } from "lucide-react";
+import { parseCurrencyInput } from "../../lib/utils";
 
 export function LimitModal({
   isOpen,
@@ -10,16 +11,25 @@ export function LimitModal({
   onRemove
 }) {
   const [amount, setAmount] = useState(valorInicial);
+  const [amountError, setAmountError] = useState("");
 
   useEffect(() => {
-    setAmount(valorInicial);
-  }, [valorInicial]);
+    if (isOpen) {
+      setAmount(valorInicial);
+      setAmountError("");
+    }
+  }, [isOpen, valorInicial]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const numericValue = parseFloat(amount) || 0;
+    const numericValue = parseCurrencyInput(amount);
+    if (numericValue === null || numericValue <= 0) {
+      setAmountError("Informe um valor maior que zero, como 500,00.");
+      return;
+    }
+    setAmountError("");
     onSave(categoria, numericValue);
   };
 
@@ -61,17 +71,24 @@ export function LimitModal({
             </label>
             <input
               type="text"
-              inputMode="numeric"
+              inputMode="decimal"
               value={amount}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9.]/g, "");
-                setAmount(val);
+                setAmount(e.target.value);
+                setAmountError("");
               }}
-              placeholder="Ex: 500"
-              className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-2xl text-white font-black placeholder:text-zinc-700 outline-none focus:border-emerald-500/80"
+              placeholder="Ex: 1.500,00"
+              aria-invalid={Boolean(amountError)}
+              aria-describedby={amountError ? "limit-amount-error" : undefined}
+              className={`w-full bg-zinc-950/80 border rounded-xl px-4 py-3 text-2xl text-white font-black placeholder:text-zinc-700 outline-none focus:border-emerald-500/80 ${amountError ? "border-red-500/70" : "border-zinc-800"}`}
               autoFocus
               onFocus={(e) => e.target.select()}
             />
+            {amountError && (
+              <p id="limit-amount-error" className="text-xs text-red-400" role="alert">
+                {amountError}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3 pt-2">

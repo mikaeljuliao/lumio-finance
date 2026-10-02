@@ -29,6 +29,7 @@ export function TransactionLedger({
   const groupedData = useMemo(() => {
     return groupTransactionsByDate(filteredTransactions);
   }, [filteredTransactions]);
+  const hasActiveFilters = searchQuery.trim().length > 0 || selectedCategory !== "all";
 
   return (
     <section className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 space-y-6">
@@ -119,20 +120,33 @@ export function TransactionLedger({
             <ReceiptText className="w-5 h-5" />
           </div>
           <p className="text-xs sm:text-sm font-bold text-zinc-300">
-            Nenhum lançamento encontrado
+            {hasActiveFilters ? "Nenhum gasto corresponde à busca" : "Nenhum gasto neste mês"}
           </p>
           <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-            {searchQuery || selectedCategory !== "all"
-              ? "Tente ajustar a busca ou filtros."
+            {hasActiveFilters
+              ? "Tente outra palavra ou categoria, ou limpe os filtros."
               : `Ainda não há registros no mês de ${monthName}.`}
           </p>
-          <button
-            onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Adicionar Gasto</span>
-          </button>
+          {hasActiveFilters ? (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategory("all");
+              }}
+              className="inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500/40 text-zinc-200 hover:text-emerald-300 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Limpar filtros</span>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenAddModal}
+              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Adicionar gasto</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

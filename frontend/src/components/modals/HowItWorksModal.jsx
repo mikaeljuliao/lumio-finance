@@ -1,6 +1,18 @@
+import { useEffect } from "react";
 import { MessageSquare, Mic, Target, X, ArrowRight } from "lucide-react";
 
 export function HowItWorksModal({ isOpen, onClose, onOpenWhatsApp }) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const examples = [
@@ -25,7 +37,12 @@ export function HowItWorksModal({ isOpen, onClose, onOpenWhatsApp }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-xl rounded-3xl border border-zinc-800 bg-[#0F0F12] p-5 shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="how-it-works-title"
+        className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-zinc-800 bg-[#0F0F12] p-5 shadow-2xl"
+      >
         <button
           onClick={onClose}
           className="absolute right-4 top-4 rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 transition-colors hover:text-white"
@@ -38,7 +55,7 @@ export function HowItWorksModal({ isOpen, onClose, onOpenWhatsApp }) {
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">
             Como funciona o Lumio
           </p>
-          <h3 className="mt-2 text-2xl font-black text-white tracking-tight">
+          <h3 id="how-it-works-title" className="mt-2 text-2xl font-black text-white tracking-tight">
             Você controla por web ou WhatsApp.
           </h3>
         </div>

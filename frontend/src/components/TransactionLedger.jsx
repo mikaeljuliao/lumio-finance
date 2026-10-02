@@ -29,6 +29,7 @@ export function TransactionLedger({
   const groupedData = useMemo(() => {
     return groupTransactionsByDate(filteredTransactions);
   }, [filteredTransactions]);
+  const hasActiveFilters = searchQuery.trim().length > 0 || selectedCategory !== "all";
 
   return (
     <section className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 space-y-6">
@@ -60,12 +61,14 @@ export function TransactionLedger({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar gasto ou palavra..."
+              aria-label="Buscar gastos por descrição ou categoria"
               className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl pl-8 pr-7 py-2 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/80 transition-colors"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                aria-label="Limpar busca"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -76,6 +79,7 @@ export function TransactionLedger({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
+              aria-label="Filtrar gastos por categoria"
               className="bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-emerald-500/80 cursor-pointer appearance-none pr-8"
             >
               <option value="all">Todas Categorias</option>
@@ -116,20 +120,33 @@ export function TransactionLedger({
             <ReceiptText className="w-5 h-5" />
           </div>
           <p className="text-xs sm:text-sm font-bold text-zinc-300">
-            Nenhum lançamento encontrado
+            {hasActiveFilters ? "Nenhum gasto corresponde à busca" : "Nenhum gasto neste mês"}
           </p>
           <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-            {searchQuery || selectedCategory !== "all"
-              ? "Tente ajustar a busca ou filtros."
+            {hasActiveFilters
+              ? "Tente outra palavra ou categoria, ou limpe os filtros."
               : `Ainda não há registros no mês de ${monthName}.`}
           </p>
-          <button
-            onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Adicionar Gasto</span>
-          </button>
+          {hasActiveFilters ? (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategory("all");
+              }}
+              className="inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500/40 text-zinc-200 hover:text-emerald-300 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Limpar filtros</span>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenAddModal}
+              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Adicionar gasto</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

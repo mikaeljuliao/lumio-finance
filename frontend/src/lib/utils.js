@@ -6,6 +6,27 @@ export function formatCurrency(value) {
   });
 }
 
+export function parseCurrencyInput(value) {
+  let normalized = String(value ?? "").trim().replace(/^R\$\s*/i, "").replace(/\s/g, "");
+  if (!normalized) return null;
+
+  if (normalized.includes(",")) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(?:\.\d{3})+$/.test(normalized)) {
+    normalized = normalized.replace(/\./g, "");
+  }
+
+  const numericValue = Number(normalized);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+export function getLocalDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatDate(dateString) {
   if (!dateString) return "";
   const dateOnly = String(dateString).split("T")[0];

@@ -1,19 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Plus, Calendar, DollarSign, Tag, FileText } from "lucide-react";
 import { CATEGORIES } from "../../lib/constants";
+import { getLocalDateInputValue, parseCurrencyInput } from "../../lib/utils";
 
 export function AddTransactionModal({ isOpen, onClose, onSave }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [amountError, setAmountError] = useState("");
   const [category, setCategory] = useState("alimentação");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(getLocalDateInputValue);
+
+  useEffect(() => {
+    if (isOpen) setAmountError("");
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const parsedAmount = parseFloat(amount);
-    if (!description.trim() || isNaN(parsedAmount) || parsedAmount <= 0) return;
+    const parsedAmount = parseCurrencyInput(amount);
+    if (parsedAmount === null || parsedAmount <= 0) {
+      setAmountError("Informe um valor válido, como 45,90.");
+      return;
+    }
+    setAmountError("");
 
     onSave({
       id: Date.now(),
@@ -26,8 +36,9 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
 
     setDescription("");
     setAmount("");
+    setAmountError("");
     setCategory("alimentação");
-    setDate(new Date().toISOString().split("T")[0]);
+    setDate(getLocalDateInputValue());
     onClose();
   };
 
@@ -84,15 +95,24 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
                 <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Valor (R$)
               </label>
               <input
-                type="number"
-                step="0.01"
-                min="0.01"
+                type="text"
+                inputMode="decimal"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
-                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500/80 font-bold"
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setAmountError("");
+                }}
+                placeholder="Ex: 45,90"
+                aria-invalid={Boolean(amountError)}
+                aria-describedby={amountError ? "expense-amount-error" : undefined}
+                className={`w-full bg-zinc-950/80 border rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500/80 font-bold ${amountError ? "border-red-500/70" : "border-zinc-800"}`}
                 required
               />
+              {amountError && (
+                <p id="expense-amount-error" className="text-xs text-red-400" role="alert">
+                  {amountError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">

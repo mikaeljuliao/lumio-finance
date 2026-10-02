@@ -60,12 +60,14 @@ export function TransactionLedger({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar gasto ou palavra..."
+              aria-label="Buscar gastos por descrição ou categoria"
               className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl pl-8 pr-7 py-2 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/80 transition-colors"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                aria-label="Limpar busca"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -76,6 +78,7 @@ export function TransactionLedger({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
+              aria-label="Filtrar gastos por categoria"
               className="bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-emerald-500/80 cursor-pointer appearance-none pr-8"
             >
               <option value="all">Todas Categorias</option>

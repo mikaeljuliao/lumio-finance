@@ -8,6 +8,7 @@ const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 const sentMessageIds = new Set();
 const pendingExpenseByUser = new Map();
+const pendingIntentSelectionByUser = new Map();
 
 function unwrapMessageContent(m) {
   if (m.viewOnceMessageV2?.message) return unwrapMessageContent(m.viewOnceMessageV2.message);
@@ -52,6 +53,19 @@ function getConfirmationPrompt(expense) {
   const category = expense.categoria || 'outros';
   const date = expense.data || new Date().toISOString().split('T')[0];
   return `Entendi: gasto de *R$ ${value}* em *${category}* na data *${date}*. Confirmar? Responda *sim* ou *não*.`;
+}
+
+function getMultiIntentPrompt(actions) {
+  const labels = actions.map(action => action === 'REGISTRAR_GASTO' ? 'gasto' : 'limites');
+  return `Você mencionou mais de uma ação: ${labels.join(' e ')}. Responda *gasto* para registrar o gasto ou *limites* para consultar seus limites.`;
+}
+
+function normalizeIntentChoice(text) {
+  const normalized = String(text || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (/^(gasto|despesa|registrar|registrar gasto|registrar despesa)$/i.test(normalized)) return 'REGISTRAR_GASTO';
+  if (/^(limite|limites|consultar|consultar limites|ver limites|ver)$/i.test(normalized)) return 'VER_LIMITES';
+  return null;
 }
 
 function isConfirmationPositive(text) {
@@ -124,6 +138,32 @@ async function processMessage(msg, remoteJid, sock) {
     return;
   }
 
+  const pendingIntentSelection = pendingIntentSelectionByUser.get(user.id);
+  if (pendingIntentSelection) {
+    const selectedAction = normalizeIntentChoice(textToProcess);
+    if (!selectedAction) {
+      await sendMessage(sock, remoteJid, { text: getMultiIntentPrompt(pendingIntentSelection.actions) }, { quoted: msg });
+      return;
+    }
+
+    pendingIntentSelectionByUser.delete(user.id);
+
+    if (selectedAction === 'REGISTRAR_GASTO') {
+      const expenseData = await extractExpense(pendingIntentSelection.originalText || textToProcess);
+      if (!Number.isFinite(Number(expenseData?.valor)) || Number(expenseData.valor) <= 0) {
+        pendingExpenseByUser.set(user.id, { categoria: expenseData?.categoria || 'outros', descricao: expenseData?.descricao || 'Gasto registrado', sourceText: pendingIntentSelection.originalText || textToProcess, stage: 'collect_data' });
+        await sendMessage(sock, remoteJid, { text: getPendingExpensePrompt() }, { quoted: msg });
+        return;
+      }
+      await saveAndBroadcastExpense(user.id, expenseData, remoteJid, msg, sock);
+      return;
+    }
+
+    const limits = await findAllLimits(user.id);
+    await sendMessage(sock, remoteJid, { text: `📋 *Seus limites mensais:*\n\n${formatLimits(limits)}` }, { quoted: msg });
+    return;
+  }
+
   const pendingExpense = pendingExpenseByUser.get(user.id);
   if (pendingExpense) {
     if (pendingExpense.stage === 'choose_category') {
@@ -189,7 +229,17 @@ async function processMessage(msg, remoteJid, sock) {
     return;
   }
 
-  const { intencao, valor, categoria } = await detectIntent(textToProcess);
+  const { intencao, valor, categoria, actions } = await detectIntent(textToProcess);
+
+  if (intencao === 'MULTIPLE_ACTIONS') {
+    const actionList = Array.isArray(actions) && actions.length ? actions : ['REGISTRAR_GASTO', 'VER_LIMITES'];
+    pendingIntentSelectionByUser.set(user.id, {
+      actions: actionList,
+      originalText: textToProcess,
+    });
+    await sendMessage(sock, remoteJid, { text: getMultiIntentPrompt(actionList) }, { quoted: msg });
+    return;
+  }
 
   if (intencao === 'DEFINIR_LIMITE') {
     if (!Number.isFinite(Number(valor)) || Number(valor) <= 0) {

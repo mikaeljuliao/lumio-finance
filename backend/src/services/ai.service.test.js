@@ -76,3 +76,10 @@ test('exposes a category list for uncertain expense registration', () => {
   assert.ok(CATEGORY_OPTIONS.includes('transporte'));
   assert.ok(CATEGORY_OPTIONS.includes('outros'));
 });
+
+test('detects when one message mixes a purchase with a limit check', () => {
+  assert.deepEqual(detectIntentLocally('gastei 50 no mercado e quero ver meus limites'), {
+    intencao: 'MULTIPLE_ACTIONS',
+    actions: ['REGISTRAR_GASTO', 'VER_LIMITES']
+  });
+});

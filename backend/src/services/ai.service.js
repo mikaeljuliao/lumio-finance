@@ -14,6 +14,7 @@ const CATEGORIES_LIST = [
   'mercado', 'educação', 'serviços', 'compras', 'presentes',
   'viagem', 'investimentos', 'outros'
 ];
+const CATEGORY_OPTIONS = [...CATEGORIES_LIST];
 
 const CATEGORY_DICTIONARY = {
   'investimentos': ['ação', 'ações', 'fundo', 'fii', 'investimento', 'investir', 'bolsa', 'crypto', 'bitcoin', 'tesouro', 'selic', 'cdb'],
@@ -64,6 +65,94 @@ function parseAmountFromText(text) {
 
   const parsed = Number(amount);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatDateForInput(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateFromText(text) {
+  const value = String(text || '').toLowerCase();
+
+  if (/hoje|hje|today/.test(value)) return formatDateForInput(new Date());
+  if (/amanh|tomorrow/.test(value)) {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    return formatDateForInput(tomorrow);
+  }
+
+  const isoMatch = value.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  const slashMatch = value.match(/(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?/);
+  if (slashMatch) {
+    const [, day, month, yearPart] = slashMatch;
+    const year = yearPart ? (yearPart.length === 2 ? `20${yearPart}` : yearPart) : new Date().getFullYear();
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  return formatDateForInput(new Date());
+}
+
+function parseExpenseFollowUp(text) {
+  const amount = parseAmountFromText(text);
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return null;
+
+  return {
+    valor: Number(amount),
+    data: parseDateFromText(text),
+  };
+}
+
+function normalizeCategoryChoice(text) {
+  const normalized = normalizeText(text || '');
+  if (!normalized) return 'outros';
+
+  const categoryMap = [
+    ['alimentacao', 'alimentação'],
+    ['saude', 'saúde'],
+    ['educacao', 'educação'],
+    ['servicos', 'serviços'],
+    ['moradia', 'moradia'],
+    ['mercado', 'mercado'],
+    ['lazer', 'lazer'],
+    ['transporte', 'transporte'],
+    ['compras', 'compras'],
+    ['presentes', 'presentes'],
+    ['viagem', 'viagem'],
+    ['investimentos', 'investimentos'],
+    ['outros', 'outros'],
+  ];
+
+  for (const [alias, category] of categoryMap) {
+    if (normalized.includes(alias)) return category;
+  }
+
+  const categoryKeywords = {
+    alimentação: ['almoço', 'lanche', 'comida', 'restaurante', 'padaria', 'pizza', 'cafe', 'coffee', 'marmita'],
+    transporte: ['uber', 'taxi', 'onibus', 'ônibus', 'bus', 'gasolina', 'combustivel', 'estacionamento', 'pedagio'],
+    lazer: ['cinema', 'show', 'bar', 'cerveja', 'chopp', 'rolê', 'game', 'playstation', 'steam', 'xbox'],
+    saúde: ['remedio', 'farmacia', 'dentista', 'medico', 'consulta', 'exame', 'academia', 'suplemento'],
+    moradia: ['aluguel', 'condominio', 'iptu', 'casa', 'apartamento', 'reforma'],
+    mercado: ['mercado', 'supermercado', 'feira', 'sacolao', 'atacadao'],
+    educação: ['curso', 'faculdade', 'escola', 'aula', 'livro', 'udemy', 'alura', 'bootcamp'],
+    serviços: ['internet', 'luz', 'agua', 'gás', 'gas', 'energia', 'wifi', 'netflix', 'spotify', 'plano', 'celular'],
+    compras: ['roupa', 'sapato', 'tenis', 'shopping', 'celular', 'fone', 'eletronico', 'ferramenta'],
+    presentes: ['presente', 'mimo', 'lembrancinha', 'aniversario'],
+    viagem: ['passagem', 'hotel', 'airbnb', 'viagem', 'viajar', 'turismo'],
+    investimentos: ['acao', 'fii', 'investimento', 'bitcoin', 'cripto', 'tesouro', 'selic'],
+  };
+
+  for (const [category, keywords] of Object.entries(categoryKeywords)) {
+    if (keywords.some(keyword => normalized.includes(keyword))) return category;
+  }
+
+  return 'outros';
 }
 
 function isSimpleGreeting(text) {
@@ -208,5 +297,8 @@ module.exports = {
   detectIntent,
   detectIntentLocally,
   parseAmountFromText,
+  parseExpenseFollowUp,
+  normalizeCategoryChoice,
+  CATEGORY_OPTIONS,
   transcribeAudio
 };

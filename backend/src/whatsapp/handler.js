@@ -1,5 +1,5 @@
 const { resolveUserFromWhatsAppMessage } = require('../services/user.service');
-const { extractExpense, detectIntent, transcribeAudio } = require('../services/ai.service');
+const { extractExpense, detectIntent, transcribeAudio, parseExpenseFollowUp, normalizeCategoryChoice, CATEGORY_OPTIONS } = require('../services/ai.service');
 const { createExpense } = require('../services/expense.service');
 const { checkLimits, findAllLimits, formatLimits, setLimit } = require('../services/limit.service');
 const { getSocketIo } = require('../socket');
@@ -7,6 +7,7 @@ const { getSocketIo } = require('../socket');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 const sentMessageIds = new Set();
+const pendingExpenseByUser = new Map();
 
 function unwrapMessageContent(m) {
   if (m.viewOnceMessageV2?.message) return unwrapMessageContent(m.viewOnceMessageV2.message);
@@ -36,6 +37,31 @@ function getHelpReply() {
     `• Consultar limites: "quais são meus limites?"\n\n` +
     `Você também pode mandar um áudio. O que gostaria de fazer?`
   );
+}
+
+function getPendingExpensePrompt() {
+  return 'Tudo bem. Qual foi o valor e quando foi? Exemplo: "R$ 80, 05/10" ou "R$ 80, hoje".';
+}
+
+function getCategorySelectionPrompt() {
+  return 'Não tenho certeza da categoria. Escolha uma opção:\n' + CATEGORY_OPTIONS.map((category, index) => `${index + 1}. ${category}`).join('\n');
+}
+
+function getConfirmationPrompt(expense) {
+  const value = Number(expense.valor || 0).toFixed(2);
+  const category = expense.categoria || 'outros';
+  const date = expense.data || new Date().toISOString().split('T')[0];
+  return `Entendi: gasto de *R$ ${value}* em *${category}* na data *${date}*. Confirmar? Responda *sim* ou *não*.`;
+}
+
+function isConfirmationPositive(text) {
+  const normalized = String(text || '').toLowerCase().trim();
+  return /^(sim|confirmo|ok|certo|salvar|yes|aceito|continue)$/i.test(normalized);
+}
+
+function isConfirmationNegative(text) {
+  const normalized = String(text || '').toLowerCase().trim();
+  return /^(nao|não|cancelar|corrigir|editar|não salvar|no)$/i.test(normalized);
 }
 
 async function processMessage(msg, remoteJid, sock) {
@@ -98,6 +124,71 @@ async function processMessage(msg, remoteJid, sock) {
     return;
   }
 
+  const pendingExpense = pendingExpenseByUser.get(user.id);
+  if (pendingExpense) {
+    if (pendingExpense.stage === 'choose_category') {
+      const resolvedCategory = normalizeCategoryChoice(textToProcess);
+      if (resolvedCategory === 'outros' && !CATEGORY_OPTIONS.some(category => textToProcess.toLowerCase().includes(category.toLowerCase()))) {
+        await sendMessage(sock, remoteJid, { text: getCategorySelectionPrompt() }, { quoted: msg });
+        return;
+      }
+
+      pendingExpense.categoria = resolvedCategory;
+      pendingExpense.stage = 'confirm_save';
+      await sendMessage(sock, remoteJid, { text: getConfirmationPrompt(pendingExpense) }, { quoted: msg });
+      return;
+    }
+
+    if (pendingExpense.stage === 'confirm_save') {
+      if (isConfirmationPositive(textToProcess)) {
+        pendingExpenseByUser.delete(user.id);
+        await saveAndBroadcastExpense(user.id, pendingExpense, remoteJid, msg, sock);
+        return;
+      }
+
+      if (isConfirmationNegative(textToProcess)) {
+        pendingExpenseByUser.delete(user.id);
+        await sendMessage(sock, remoteJid, { text: 'Tudo bem. Podemos tentar de novo.' }, { quoted: msg });
+        return;
+      }
+
+      await sendMessage(sock, remoteJid, { text: getConfirmationPrompt(pendingExpense) }, { quoted: msg });
+      return;
+    }
+
+    const parsedFollowUp = parseExpenseFollowUp(textToProcess);
+    if (!parsedFollowUp) {
+      pendingExpenseByUser.set(user.id, pendingExpense);
+      await sendMessage(sock, remoteJid, { text: getPendingExpensePrompt() }, { quoted: msg });
+      return;
+    }
+
+    const resolvedCategory = normalizeCategoryChoice(`${pendingExpense.descricao || ''} ${textToProcess}`);
+    const finalExpense = {
+      valor: parsedFollowUp.valor,
+      categoria: resolvedCategory === 'outros' ? (pendingExpense.categoria || 'outros') : resolvedCategory,
+      descricao: pendingExpense.descricao || 'Gasto registrado',
+      data: parsedFollowUp.data,
+      stage: 'confirm_save',
+    };
+
+    if (!pendingExpense.categoria || pendingExpense.categoria === 'outros' || resolvedCategory === 'outros') {
+      pendingExpenseByUser.set(user.id, {
+        ...finalExpense,
+        stage: 'choose_category',
+      });
+      await sendMessage(sock, remoteJid, { text: getCategorySelectionPrompt() }, { quoted: msg });
+      return;
+    }
+
+    pendingExpenseByUser.set(user.id, {
+      ...finalExpense,
+      stage: 'confirm_save',
+    });
+    await sendMessage(sock, remoteJid, { text: getConfirmationPrompt(finalExpense) }, { quoted: msg });
+    return;
+  }
+
   const { intencao, valor, categoria } = await detectIntent(textToProcess);
 
   if (intencao === 'DEFINIR_LIMITE') {
@@ -126,12 +217,52 @@ async function processMessage(msg, remoteJid, sock) {
   } else if (intencao === 'REGISTRAR_GASTO') {
     const expenseData = await extractExpense(textToProcess);
     if (!Number.isFinite(Number(expenseData?.valor)) || Number(expenseData.valor) <= 0) {
+      const category = expenseData?.categoria || 'outros';
+      const description = (expenseData?.descricao || textToProcess.replace(/gastei|paguei|comprei/gi, '').trim()) || 'Gasto';
+      pendingExpenseByUser.set(user.id, { categoria: category, descricao: description, sourceText: textToProcess, stage: 'collect_data' });
       await sendMessage(sock, remoteJid, {
-        text: 'Qual foi o valor do gasto? Exemplo: "gastei R$ 35 no almoço".'
+        text: getPendingExpensePrompt(),
       }, { quoted: msg });
       return;
     }
-    await saveAndBroadcastExpense(user.id, expenseData, remoteJid, msg, sock);
+
+    const hasExplicitDate = /(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|hoje|amanh|hje|tomorrow)/i.test(textToProcess);
+    if (!hasExplicitDate) {
+      pendingExpenseByUser.set(user.id, {
+        categoria: expenseData.categoria || 'outros',
+        descricao: expenseData.descricao || 'Gasto registrado',
+        sourceText: textToProcess,
+        stage: 'collect_data',
+      });
+      await sendMessage(sock, remoteJid, {
+        text: getPendingExpensePrompt(),
+      }, { quoted: msg });
+      return;
+    }
+
+    if ((expenseData.categoria || 'outros') === 'outros') {
+      pendingExpenseByUser.set(user.id, {
+        categoria: 'outros',
+        descricao: expenseData.descricao || 'Gasto registrado',
+        valor: Number(expenseData.valor),
+        data: expenseData.data || new Date().toISOString().split('T')[0],
+        sourceText: textToProcess,
+        stage: 'choose_category',
+      });
+      await sendMessage(sock, remoteJid, { text: getCategorySelectionPrompt() }, { quoted: msg });
+      return;
+    }
+
+    pendingExpenseByUser.set(user.id, {
+      categoria: expenseData.categoria,
+      descricao: expenseData.descricao || 'Gasto registrado',
+      valor: Number(expenseData.valor),
+      data: expenseData.data || new Date().toISOString().split('T')[0],
+      sourceText: textToProcess,
+      stage: 'confirm_save',
+    });
+    await sendMessage(sock, remoteJid, { text: getConfirmationPrompt({ valor: expenseData.valor, categoria: expenseData.categoria, data: expenseData.data || new Date().toISOString().split('T')[0] }) }, { quoted: msg });
+    return;
   } else {
     await sendMessage(sock, remoteJid, { text: getHelpReply() }, { quoted: msg });
   }

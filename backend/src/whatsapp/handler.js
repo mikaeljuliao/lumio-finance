@@ -23,7 +23,18 @@ function isBotReply(text) {
     text.includes('🚩') ||
     text.includes('📋 *Seus limites') ||
     text.includes('🤖 *Como me usar') ||
+    text.includes('🤖 *Como posso ajudar?') ||
     text.includes('⚠️ *Atenção:')
+  );
+}
+
+function getHelpReply() {
+  return (
+    `🤖 *Como posso ajudar?*\n\n` +
+    `• Registrar gasto: "gastei R$ 35 no almoço"\n` +
+    `• Definir limite: "limite de R$ 300 em lazer"\n` +
+    `• Consultar limites: "quais são meus limites?"\n\n` +
+    `Você também pode mandar um áudio. O que gostaria de fazer?`
   );
 }
 
@@ -49,13 +60,32 @@ async function processMessage(msg, remoteJid, sock) {
   let textToProcess = messageText;
 
   if (isAudio) {
-    const buffer = await downloadMediaMessage(msg, 'buffer', {});
-    const transcribed = await transcribeAudio(buffer, content.audioMessage.mimetype);
-    if (!transcribed) return;
-    textToProcess = transcribed;
+    try {
+      const buffer = await downloadMediaMessage(msg, 'buffer', {});
+      const transcribed = await transcribeAudio(buffer, content.audioMessage.mimetype);
+      if (!transcribed) {
+        await sendMessage(sock, remoteJid, {
+          text: 'Não consegui entender esse áudio. Pode enviar outro ou escrever a mensagem?'
+        }, { quoted: msg });
+        return;
+      }
+      textToProcess = String(transcribed).trim();
+    } catch (error) {
+      console.error('[WHATSAPP] Audio processing error:', error.message);
+      await sendMessage(sock, remoteJid, {
+        text: 'Tive um problema para ouvir esse áudio. Tente novamente ou envie sua mensagem por texto.'
+      }, { quoted: msg });
+      return;
+    }
   }
 
-  if (!textToProcess) return;
+  if (!textToProcess) {
+    const reply = isAudio
+      ? 'Não consegui entender esse áudio. Pode enviar outro ou escrever a mensagem?'
+      : 'Por enquanto consigo entender mensagens de texto e áudio. Conte um gasto ou peça ajuda para começar.';
+    await sendMessage(sock, remoteJid, { text: reply }, { quoted: msg });
+    return;
+  }
 
   if (textToProcess.startsWith('/ajuda')) {
     const helpText =
@@ -70,7 +100,14 @@ async function processMessage(msg, remoteJid, sock) {
 
   const { intencao, valor, categoria } = await detectIntent(textToProcess);
 
-  if (intencao === 'DEFINIR_LIMITE' && valor) {
+  if (intencao === 'DEFINIR_LIMITE') {
+    if (!Number.isFinite(Number(valor)) || Number(valor) <= 0) {
+      await sendMessage(sock, remoteJid, {
+        text: 'Qual valor você quer definir para esse limite? Exemplo: "limite de R$ 300 em lazer".'
+      }, { quoted: msg });
+      return;
+    }
+
     const catNorm = (categoria || '').toLowerCase().trim();
     const catFinal = (!catNorm || catNorm === 'outros' || catNorm === 'geral')
       ? (textToProcess.toLowerCase().includes('outros') ? 'outros' : 'geral')
@@ -88,7 +125,15 @@ async function processMessage(msg, remoteJid, sock) {
     await sendMessage(sock, remoteJid, { text: `📋 *Seus limites mensais:*\n\n${formatLimits(limits)}` }, { quoted: msg });
   } else if (intencao === 'REGISTRAR_GASTO') {
     const expenseData = await extractExpense(textToProcess);
+    if (!Number.isFinite(Number(expenseData?.valor)) || Number(expenseData.valor) <= 0) {
+      await sendMessage(sock, remoteJid, {
+        text: 'Qual foi o valor do gasto? Exemplo: "gastei R$ 35 no almoço".'
+      }, { quoted: msg });
+      return;
+    }
     await saveAndBroadcastExpense(user.id, expenseData, remoteJid, msg, sock);
+  } else {
+    await sendMessage(sock, remoteJid, { text: getHelpReply() }, { quoted: msg });
   }
 }
 

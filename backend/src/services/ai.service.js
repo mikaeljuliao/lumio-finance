@@ -30,12 +30,72 @@ const CATEGORY_DICTIONARY = {
   'presentes': ['presente', 'mimo', 'doação', 'lembrancinha', 'aniversário']
 };
 
+function normalizeText(text) {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function categorizeLocally(text) {
-  const t = text.toLowerCase();
+  const t = normalizeText(text);
+  const explicitCategory = CATEGORIES_LIST.find(category =>
+    new RegExp(`\\b${normalizeText(category)}\\b`).test(t)
+  );
+  if (explicitCategory) return explicitCategory;
+
   for (const [cat, words] of Object.entries(CATEGORY_DICTIONARY)) {
-    if (words.some(w => t.includes(w))) return cat;
+    if (words.some(w => t.includes(normalizeText(w)))) return cat;
   }
   return 'outros';
+}
+
+function parseAmountFromText(text) {
+  const match = String(text || '').match(/\d[\d. ]*(?:,\d{1,2})?/);
+  if (!match) return null;
+
+  let amount = match[0].replace(/\s/g, '');
+  if (amount.includes(',')) {
+    amount = amount.replace(/\./g, '').replace(',', '.');
+  } else if (/^\d{1,3}(?:\.\d{3})+$/.test(amount)) {
+    amount = amount.replace(/\./g, '');
+  }
+
+  const parsed = Number(amount);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isSimpleGreeting(text) {
+  const normalized = normalizeText(text).replace(/[!?.,]/g, ' ').replace(/\s+/g, ' ').trim();
+  return /^(oi|ola|opa|eai|e ae|bom dia|boa tarde|boa noite|tudo bem|obrigado|obrigada|valeu)(\s+(lumio|bot|kkk|haha))*$/.test(normalized);
+}
+
+function detectIntentLocally(text) {
+  const normalized = normalizeText(text);
+  if (isSimpleGreeting(normalized)) return { intencao: 'NAO_ENTENDIDA' };
+
+  if (
+    ((/\b(quais|ver|consultar|mostrar|liste|listar)\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
+    normalized.includes('quanto posso gastar')
+  ) {
+    return { intencao: 'VER_LIMITES' };
+  }
+
+  const amount = parseAmountFromText(text);
+  if (/\blimite\b|\bmaximo\b|\bmaxima\b/.test(normalized)) {
+    const category = categorizeLocally(text);
+    const categoryFinal = category === 'outros' && !normalized.includes('outros') ? 'geral' : category;
+    return { intencao: 'DEFINIR_LIMITE', valor: amount, categoria: categoryFinal };
+  }
+
+  const hasExpenseCue = /\b(gastei|paguei|comprei|custou|anota|registrar|registra|despesa|gasto)\b/.test(normalized);
+  const hasKnownCategory = categorizeLocally(text) !== 'outros';
+  if (hasExpenseCue || (amount !== null && hasKnownCategory)) {
+    return { intencao: 'REGISTRAR_GASTO', valor: amount };
+  }
+
+  return { intencao: 'NAO_ENTENDIDA' };
 }
 
 const INTENT_PROMPT = `
@@ -44,6 +104,7 @@ INTENÇÕES POSSÍVEIS:
 1. "REGISTRAR_GASTO": Ex: "gastei 50 no bar", "paguei 100 de luz"
 2. "DEFINIR_LIMITE": Ex: "limite de 500 em lazer", "meu limite geral é 2000", "definir limite 1500", "quero gastar no máximo 300 com mercado"
 3. "VER_LIMITES": Ex: "quais meus limites?", "ver limites", "quanto posso gastar?"
+4. "NAO_ENTENDIDA": Saudações, mensagens sem relação com as funções disponíveis ou pedidos que você não consegue atender.
 
 Categorias permitidas: ${CATEGORIES_LIST.join(', ')}, geral.
 
@@ -51,30 +112,24 @@ REGRAS DE CATEGORIA PARA LIMITES:
 - Se o limite for para uma categoria específica da lista (ex: mercado, lazer, alimentação, educação), retorne essa categoria em minúsculas.
 - Se for um limite total/geral para a carteira inteira ou se não for informada uma categoria específica, retorne "geral".
 
-Retorne APENAS JSON no formato: {"intencao": "DEFINIR_LIMITE" | "REGISTRAR_GASTO" | "VER_LIMITES", "valor": number, "categoria": "string"}
+Não invente valores. Se a pessoa demonstrar que quer registrar um gasto ou definir um limite, mas não informar o valor, mantenha a intenção e retorne "valor": null para que o sistema possa perguntar.
+Retorne APENAS JSON no formato: {"intencao": "DEFINIR_LIMITE" | "REGISTRAR_GASTO" | "VER_LIMITES" | "NAO_ENTENDIDA", "valor": number | null, "categoria": "string"}
 `;
 
 async function detectIntent(text) {
+  if (isSimpleGreeting(text)) return { intencao: 'NAO_ENTENDIDA' };
+
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const result = await model.generateContent(`${INTENT_PROMPT}\n\nMensagem: "${text}"`);
     const response = await result.response;
     let resText = response.text().trim();
     resText = resText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(resText);
+    const parsed = JSON.parse(resText);
+    const supportedIntents = ['REGISTRAR_GASTO', 'DEFINIR_LIMITE', 'VER_LIMITES', 'NAO_ENTENDIDA'];
+    return supportedIntents.includes(parsed.intencao) ? parsed : detectIntentLocally(text);
   } catch (e) {
-    const t = text.toLowerCase();
-    if ((t.includes('quais') || t.includes('ver') || t.includes('consultar') || t.includes('meus')) && t.includes('limite')) {
-      return { intencao: 'VER_LIMITES' };
-    }
-    if (t.includes('limite') || t.includes('máximo') || t.includes('maximo')) {
-      const matchVal = text.match(/(\d+(?:[.,]\d+)?)/);
-      const val = matchVal ? parseFloat(matchVal[1].replace(',', '.')) : 0;
-      const cat = categorizeLocally(text);
-      const catFinal = (cat === 'outros' && !t.includes('outros')) ? 'geral' : cat;
-      return { intencao: 'DEFINIR_LIMITE', valor: val, categoria: catFinal };
-    }
-    return { intencao: 'REGISTRAR_GASTO' };
+    return detectIntentLocally(text);
   }
 }
 
@@ -116,9 +171,8 @@ async function extractExpense(messageText) {
     }
   }
 
-  const matchValor = messageText.match(/(\d+(?:[.,]\d+)?)/);
   return {
-    valor: matchValor ? parseFloat(matchValor[0].replace(',', '.')) : null,
+    valor: parseAmountFromText(messageText),
     categoria: categorizeLocally(messageText),
     descricao: messageText.replace(/gastei|paguei|comprei/gi, '').trim(),
     data: new Date().toISOString().split('T')[0]
@@ -149,4 +203,10 @@ async function transcribeAudio(buffer, mimetype) {
   }
 }
 
-module.exports = { extractExpense, detectIntent, transcribeAudio };
+module.exports = {
+  extractExpense,
+  detectIntent,
+  detectIntentLocally,
+  parseAmountFromText,
+  transcribeAudio
+};

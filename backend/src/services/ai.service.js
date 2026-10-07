@@ -151,7 +151,7 @@ function normalizeCategoryChoice(text) {
     }
   }
 
-  const healthPriorityKeywords = ['ortodontico', 'ortodôntico', 'aparelho', 'aparelhos', 'molar', 'dente', 'dentista', 'consulta', 'exame', 'farmacia', 'farmácia', 'remedio', 'remédio', 'academia', 'suplemento', 'fisioterapia', 'psicologo', 'psicólogo', 'terapia', 'nutricionista', 'clinica'];
+  const healthPriorityKeywords = ['ortodontico', 'ortodôntico', 'aparelho', 'aparelhos', 'molar', 'dente', 'dentista', 'farmacia', 'farmácia', 'remedio', 'remédio', 'academia', 'suplemento', 'fisioterapia', 'psicologo', 'psicólogo', 'terapia', 'nutricionista', 'clinica', 'cabelo', 'corte de cabelo', 'cabeleireiro', 'cabelereiro', 'salao', 'salão', 'estetica', 'estética', 'maquiagem', 'depilacao', 'depilação', 'barbearia', 'barbeiro'];
 
   for (const keyword of healthPriorityKeywords) {
     if (normalized.includes(normalizeText(keyword))) return 'saúde';
@@ -206,7 +206,7 @@ function normalizeCategoryChoice(text) {
     alimentação: ['almoco', 'almoço', 'lanche', 'comida', 'restaurante', 'padaria', 'pizza', 'cafe', 'café', 'coffee', 'marmita', 'jantar', 'churrasco', 'hamburguer', 'sorvete', 'delivery', 'cafezinho', 'sushi', 'kebab'],
     transporte: ['uber', 'taxi', 'onibus', 'ônibus', 'bus', 'gasolina', 'combustivel', 'estacionamento', 'pedagio', 'vale transporte', 'carona', 'metrô', 'metro'],
     lazer: ['cinema', 'show', 'bar', 'cerveja', 'chopp', 'rolê', 'role', 'game', 'playstation', 'steam', 'xbox', 'parque', 'teatro', 'festival', 'ingresso'],
-    saúde: ['remedio', 'remédio', 'farmacia', 'farmácia', 'dentista', 'medico', 'médico', 'consulta', 'exame', 'academia', 'suplemento', 'whey', 'psicologo', 'psicólogo', 'fisioterapia', 'nutricionista', 'terapia', 'clinica', 'ortodontico', 'ortodôntico', 'aparelho', 'aparelhos'],
+    saúde: ['remedio', 'remédio', 'farmacia', 'farmácia', 'dentista', 'medico', 'médico', 'consulta', 'exame', 'academia', 'suplemento', 'whey', 'psicologo', 'psicólogo', 'fisioterapia', 'nutricionista', 'terapia', 'clinica', 'ortodontico', 'ortodôntico', 'aparelho', 'aparelhos', 'cabelo', 'corte de cabelo', 'cabeleireiro', 'cabelereiro', 'salao', 'salão', 'estetica', 'estética', 'maquiagem', 'depilacao', 'depilação', 'barbearia', 'barbeiro'],
     moradia: ['aluguel', 'condominio', 'iptu', 'casa', 'apartamento', 'reforma', 'manutencao', 'reparo', 'conserto', 'pintura'],
     mercado: ['mercado', 'supermercado', 'feira', 'sacolao', 'atacadao', 'hortifruti', 'frutas', 'verduras', 'ovos', 'leite', 'arroz', 'carne', 'mercearia', 'merceario'],
     educação: ['curso', 'faculdade', 'escola', 'aula', 'livro', 'udemy', 'alura', 'bootcamp', 'material escolar'],

@@ -101,6 +101,7 @@ test('recognizes real-world food, health, and market contexts before asking for 
   assert.equal(normalizeCategoryChoice('gastei 180 na feira e hortifruti'), 'mercado');
   assert.equal(normalizeCategoryChoice('presente de aniversario para meu pai'), 'presentes');
   assert.equal(normalizeCategoryChoice('manutenção do aparelho ortodontico'), 'saúde');
+  assert.equal(normalizeCategoryChoice('corte de cabelo'), 'saúde');
 });
 
 test('recognizes explicit value + dental maintenance expense even without a verb like “gastei”', () => {

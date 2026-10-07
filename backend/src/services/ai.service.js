@@ -17,18 +17,18 @@ const CATEGORIES_LIST = [
 const CATEGORY_OPTIONS = [...CATEGORIES_LIST];
 
 const CATEGORY_DICTIONARY = {
-  'investimentos': ['ação', 'ações', 'fundo', 'fii', 'investimento', 'investir', 'bolsa', 'crypto', 'bitcoin', 'tesouro', 'selic', 'cdb'],
-  'lazer': ['festa', 'balada', 'cinema', 'show', 'diversão', 'diversao', 'bar', 'cerveja', 'chope', 'chopp', 'rolê', 'game', 'playstation', 'steam', 'xbox'],
-  'viagem': ['avião', 'hotel', 'airbnb', 'passagem', 'viagem', 'viajar', 'hospedagem', 'turismo', 'mala'],
-  'educação': ['curso', 'faculdade', 'escola', 'aula', 'estudo', 'livro', 'mensalidade', 'udemy', 'alura', 'programação', 'dev', 'bootcamp'],
-  'serviços': ['luz', 'água', 'gas', 'gás', 'energia', 'internet', 'wifi', 'assinatura', 'netflix', 'spotify', 'prime', 'mensalidade', 'celular', 'plano'],
-  'moradia': ['aluguel', 'condomínio', 'condominio', 'iptu', 'reforma', 'móvel', 'casa', 'apartamento', 'quarto'],
-  'alimentação': ['comida', 'lanche', 'salgado', 'pizza', 'ifood', 'rappi', 'restaurante', 'marmita', 'padaria', 'café', 'almoço', 'jantar'],
-  'transporte': ['uber', '99', 'taxi', 'táxi', 'gasolina', 'combustível', 'onibus', 'ônibus', 'metrô', 'pedágio', 'estacionamento'],
-  'saúde': ['remédio', 'remedio', 'farmácia', 'médico', 'dentista', 'hospital', 'exame', 'academia', 'suplemento', 'whey', 'psicólogo'],
-  'mercado': ['mercado', 'supermercado', 'compras do mês', 'atacadão', 'feira', 'sacolão'],
-  'compras': ['roupa', 'sapato', 'tênis', 'shopping', 'celular', 'fone', 'eletrônico', 'ferramenta', 'presente'],
-  'presentes': ['presente', 'mimo', 'doação', 'lembrancinha', 'aniversário']
+  'investimentos': ['ação', 'ações', 'fundo', 'fii', 'investimento', 'investir', 'bolsa', 'crypto', 'bitcoin', 'tesouro', 'selic', 'cdb', 'aporte', 'carteira', 'renda variável', 'renda variavel'],
+  'lazer': ['festa', 'balada', 'cinema', 'show', 'diversão', 'diversao', 'bar', 'cerveja', 'chope', 'chopp', 'rolê', 'role', 'game', 'playstation', 'steam', 'xbox', 'parque', 'teatro', 'ingresso', 'festival', 'piscina'],
+  'viagem': ['avião', 'aviao', 'hotel', 'airbnb', 'passagem', 'viagem', 'viajar', 'hospedagem', 'turismo', 'mala', 'albergue', 'hostel', 'trekking', 'turista'],
+  'educação': ['curso', 'faculdade', 'escola', 'aula', 'estudo', 'livro', 'mensalidade', 'udemy', 'alura', 'programação', 'programacao', 'dev', 'bootcamp', 'material escolar', 'uniforme', 'mensalidade escolar'],
+  'serviços': ['luz', 'água', 'agua', 'gas', 'gás', 'energia', 'internet', 'wifi', 'assinatura', 'netflix', 'spotify', 'prime', 'mensalidade', 'celular', 'plano', 'streaming', 'adobe', 'dropbox', 'conta', 'contas'],
+  'moradia': ['aluguel', 'condomínio', 'condominio', 'iptu', 'reforma', 'móvel', 'moveis', 'casa', 'apartamento', 'quarto', 'manutenção', 'manutencao', 'conserto', 'obras', 'reparo', 'pintura'],
+  'alimentação': ['comida', 'lanche', 'salgado', 'pizza', 'ifood', 'rappi', 'restaurante', 'marmita', 'padaria', 'café', 'cafe', 'almoço', 'almoco', 'jantar', 'churrasco', 'hamburguer', 'burger', 'sorvete', 'cafeteria', 'doceria', 'sushi', 'delivery', 'kebab'],
+  'transporte': ['uber', '99', 'taxi', 'táxi', 'gasolina', 'combustível', 'combustivel', 'onibus', 'ônibus', 'metrô', 'metro', 'pedágio', 'pedagio', 'estacionamento', 'vale transporte', 'bilhete', 'carona'],
+  'saúde': ['remédio', 'remedio', 'farmácia', 'farmacia', 'médico', 'medico', 'dentista', 'hospital', 'exame', 'academia', 'suplemento', 'whey', 'psicólogo', 'psicologo', 'consulta', 'fisioterapia', 'nutricionista', 'terapia', 'clinica', 'medicação', 'medicacao'],
+  'mercado': ['mercado', 'supermercado', 'compras do mês', 'compras do mes', 'atacadão', 'atacadao', 'feira', 'sacolão', 'sacolao', 'hortifruti', 'frutas', 'verduras', 'ovos', 'leite', 'arroz', 'carnes', 'mercearia', 'horta'],
+  'compras': ['roupa', 'sapato', 'tênis', 'tenis', 'shopping', 'celular', 'fone', 'eletrônico', 'eletronico', 'ferramenta', 'presente', 'perfume', 'camera', 'notebook', 'mochila', 'acessorio', 'acessórios', 'relógio', 'relogio', 'pulseira'],
+  'presentes': ['presente', 'mimo', 'doação', 'doacao', 'lembrancinha', 'aniversário', 'aniversario', 'natal', 'casamento', 'dia dos pais', 'dia das maes', 'namorado', 'noiva', 'convite']
 };
 
 function normalizeText(text) {
@@ -53,10 +53,18 @@ function categorizeLocally(text) {
 }
 
 function parseAmountFromText(text) {
-  const match = String(text || '').match(/\d[\d. ]*(?:,\d{1,2})?/);
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+
+  const dateLikePattern = /(^|[\s(])\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?(?=$|[\s),.;!?])/gi;
+  const candidateText = raw.replace(dateLikePattern, ' ');
+
+  if (!candidateText || /^\s*$/.test(candidateText)) return null;
+
+  const match = candidateText.match(/(?:r\$\s*)?((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[.,]\d{1,2})?)/i);
   if (!match) return null;
 
-  let amount = match[0].replace(/\s/g, '');
+  let amount = match[1].replace(/\s/g, '');
   if (amount.includes(',')) {
     amount = amount.replace(/\./g, '').replace(',', '.');
   } else if (/^\d{1,3}(?:\.\d{3})+$/.test(amount)) {
@@ -64,7 +72,7 @@ function parseAmountFromText(text) {
   }
 
   const parsed = Number(amount);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function formatDateForInput(date = new Date()) {
@@ -99,7 +107,21 @@ function parseDateFromText(text) {
   return formatDateForInput(new Date());
 }
 
+function hasExplicitDatePattern(text) {
+  return /(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|hoje|amanh|hje|tomorrow)/i.test(String(text || ''));
+}
+
 function parseExpenseFollowUp(text) {
+  const valueText = String(text || '');
+  const explicitDateOnly = hasExplicitDatePattern(valueText) && !/[rR]\$?\s*\d/.test(valueText) && !/\d[\d. ]*(?:,\d{1,2})?/.test(valueText.replace(/\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?/gi, ''));
+
+  if (explicitDateOnly) {
+    return {
+      valor: null,
+      data: parseDateFromText(valueText),
+    };
+  }
+
   const amount = parseAmountFromText(text);
   if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return null;
 
@@ -129,6 +151,12 @@ function normalizeCategoryChoice(text) {
     }
   }
 
+  const healthPriorityKeywords = ['ortodontico', 'ortodôntico', 'aparelho', 'aparelhos', 'molar', 'dente', 'dentista', 'consulta', 'exame', 'farmacia', 'farmácia', 'remedio', 'remédio', 'academia', 'suplemento', 'fisioterapia', 'psicologo', 'psicólogo', 'terapia', 'nutricionista', 'clinica'];
+
+  for (const keyword of healthPriorityKeywords) {
+    if (normalized.includes(normalizeText(keyword))) return 'saúde';
+  }
+
   const categoryMap = [
     ['alimentacao', 'alimentação'],
     ['saude', 'saúde'],
@@ -143,6 +171,31 @@ function normalizeCategoryChoice(text) {
     ['viagem', 'viagem'],
     ['investimentos', 'investimentos'],
     ['outros', 'outros'],
+    ['farmacia', 'saúde'],
+    ['academia', 'saúde'],
+    ['restaurante', 'alimentação'],
+    ['padaria', 'alimentação'],
+    ['cafe', 'alimentação'],
+    ['mercadinho', 'mercado'],
+    ['hortifruti', 'mercado'],
+    ['feira', 'mercado'],
+    ['presente', 'presentes'],
+    ['aniversario', 'presentes'],
+    ['natal', 'presentes'],
+    ['cinema', 'lazer'],
+    ['show', 'lazer'],
+    ['bar', 'lazer'],
+    ['uber', 'transporte'],
+    ['onibus', 'transporte'],
+    ['combustivel', 'transporte'],
+    ['gasolina', 'transporte'],
+    ['luz', 'serviços'],
+    ['agua', 'serviços'],
+    ['internet', 'serviços'],
+    ['plano', 'serviços'],
+    ['aluguel', 'moradia'],
+    ['condominio', 'moradia'],
+    ['iptu', 'moradia']
   ];
 
   for (const [alias, category] of categoryMap) {
@@ -150,22 +203,23 @@ function normalizeCategoryChoice(text) {
   }
 
   const categoryKeywords = {
-    alimentação: ['almoço', 'lanche', 'comida', 'restaurante', 'padaria', 'pizza', 'cafe', 'coffee', 'marmita'],
-    transporte: ['uber', 'taxi', 'onibus', 'ônibus', 'bus', 'gasolina', 'combustivel', 'estacionamento', 'pedagio'],
-    lazer: ['cinema', 'show', 'bar', 'cerveja', 'chopp', 'rolê', 'game', 'playstation', 'steam', 'xbox'],
-    saúde: ['remedio', 'farmacia', 'dentista', 'medico', 'consulta', 'exame', 'academia', 'suplemento'],
-    moradia: ['aluguel', 'condominio', 'iptu', 'casa', 'apartamento', 'reforma'],
-    mercado: ['mercado', 'supermercado', 'feira', 'sacolao', 'atacadao'],
-    educação: ['curso', 'faculdade', 'escola', 'aula', 'livro', 'udemy', 'alura', 'bootcamp'],
-    serviços: ['internet', 'luz', 'agua', 'gás', 'gas', 'energia', 'wifi', 'netflix', 'spotify', 'plano', 'celular'],
-    compras: ['roupa', 'sapato', 'tenis', 'shopping', 'celular', 'fone', 'eletronico', 'ferramenta'],
-    presentes: ['presente', 'mimo', 'lembrancinha', 'aniversario'],
-    viagem: ['passagem', 'hotel', 'airbnb', 'viagem', 'viajar', 'turismo'],
-    investimentos: ['acao', 'fii', 'investimento', 'bitcoin', 'cripto', 'tesouro', 'selic'],
+    alimentação: ['almoco', 'almoço', 'lanche', 'comida', 'restaurante', 'padaria', 'pizza', 'cafe', 'café', 'coffee', 'marmita', 'jantar', 'churrasco', 'hamburguer', 'sorvete', 'delivery', 'cafezinho', 'sushi', 'kebab'],
+    transporte: ['uber', 'taxi', 'onibus', 'ônibus', 'bus', 'gasolina', 'combustivel', 'estacionamento', 'pedagio', 'vale transporte', 'carona', 'metrô', 'metro'],
+    lazer: ['cinema', 'show', 'bar', 'cerveja', 'chopp', 'rolê', 'role', 'game', 'playstation', 'steam', 'xbox', 'parque', 'teatro', 'festival', 'ingresso'],
+    saúde: ['remedio', 'remédio', 'farmacia', 'farmácia', 'dentista', 'medico', 'médico', 'consulta', 'exame', 'academia', 'suplemento', 'whey', 'psicologo', 'psicólogo', 'fisioterapia', 'nutricionista', 'terapia', 'clinica', 'ortodontico', 'ortodôntico', 'aparelho', 'aparelhos'],
+    moradia: ['aluguel', 'condominio', 'iptu', 'casa', 'apartamento', 'reforma', 'manutencao', 'reparo', 'conserto', 'pintura'],
+    mercado: ['mercado', 'supermercado', 'feira', 'sacolao', 'atacadao', 'hortifruti', 'frutas', 'verduras', 'ovos', 'leite', 'arroz', 'carne', 'mercearia', 'merceario'],
+    educação: ['curso', 'faculdade', 'escola', 'aula', 'livro', 'udemy', 'alura', 'bootcamp', 'material escolar'],
+    serviços: ['internet', 'luz', 'agua', 'gás', 'gas', 'energia', 'wifi', 'netflix', 'spotify', 'plano', 'celular', 'assinatura', 'streaming'],
+    compras: ['roupa', 'sapato', 'tenis', 'shopping', 'celular', 'fone', 'eletronico', 'ferramenta', 'perfume', 'notebook', 'mochila', 'relogio', 'pulseira'],
+    presentes: ['presente', 'mimo', 'lembrancinha', 'aniversario', 'natal', 'casamento', 'dia dos pais', 'dia das maes'],
+    viagem: ['passagem', 'hotel', 'airbnb', 'viagem', 'viajar', 'turismo', 'aviao', 'hospedagem', 'mala', 'albergue'],
+    investimentos: ['acao', 'fii', 'investimento', 'bitcoin', 'cripto', 'tesouro', 'selic', 'aporte', 'carteira'],
   };
 
   for (const [category, keywords] of Object.entries(categoryKeywords)) {
-    if (keywords.some(keyword => normalized.includes(keyword))) return category;
+    const matchedKeyword = keywords.find(keyword => normalized.includes(normalizeText(keyword)));
+    if (matchedKeyword) return category;
   }
 
   return 'outros';
@@ -245,6 +299,18 @@ INTENÇÕES POSSÍVEIS:
 4. "MULTIPLE_ACTIONS": Quando a mensagem combina duas ações em uma só frase, como "gastei 50 no mercado e quero ver meus limites".
 5. "NAO_ENTENDIDA": Saudações, mensagens sem relação com as funções disponíveis ou pedidos que você não consegue atender.
 
+CONTEXTOS IMPORTANTES DE CATEGORIA:
+- Alimentação: almoço, café, restaurante, marmita, padaria, churrasco, sushi, delivery, lanche, pizza
+- Saúde: academia, farmácia, remédio, dentista, consulta, exame, suplemento, fisioterapia
+- Mercado: mercado, supermercado, feira, hortifruti, sacolão, ovos, leite, arroz, frutas
+- Transporte: uber, gasolina, ônibus, estacionamento, pedágio, taxi
+- Lazer: cinema, show, bar, cerveja, jogo, playstation, xbox
+- Presentes: presente, aniversário, natal, casamento, lembrancinha
+- Serviços: luz, água, internet, netflix, spotify, plano, celular
+- Moradia: aluguel, condomínio, IPTU, reforma, manutenção
+
+Use esses sinais como contexto para decidir a categoria. Só pergunte categoria quando a mensagem não tiver contexto suficiente para decidir com segurança.
+
 Categorias permitidas: ${CATEGORIES_LIST.join(', ')}, geral.
 
 REGRAS DE CATEGORIA PARA LIMITES:
@@ -289,6 +355,12 @@ REGRAS DE OURO:
 - "serviços": Contas recorrentes (luz, água, internet, assinaturas de apps).
 - "moradia": Aluguel, condomínio, IPTU.
 - "viagem": Hotéis, passagens, gastos em trânsito de férias.
+- "alimentação": almoço, café, restaurante, marmita, padaria, churrasco, delivery, lanche, pizza.
+- "saúde": academia, farmácia, remédio, dentista, consulta, exame, suplemento, fisioterapia.
+- "mercado": mercado, supermercado, feira, hortifruti, ovos, frutas, leite, arroz.
+- "presentes": presente, aniversário, natal, casamento, lembrancinha.
+
+Se o contexto for forte, use a categoria correta sem perguntar. Só peça categoria quando a frase for ambígua demais.
 
 Retorne JSON: {"valor": num, "categoria": "string", "descricao": "string", "data": "YYYY-MM-DD"}
 `;
@@ -354,6 +426,7 @@ module.exports = {
   detectIntent,
   detectIntentLocally,
   parseAmountFromText,
+  parseDateFromText,
   parseExpenseFollowUp,
   normalizeCategoryChoice,
   CATEGORY_OPTIONS,

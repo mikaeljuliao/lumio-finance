@@ -1,5 +1,5 @@
 const { resolveUserFromWhatsAppMessage } = require('../services/user.service');
-const { extractExpense, detectIntent, transcribeAudio, parseExpenseFollowUp, normalizeCategoryChoice, CATEGORY_OPTIONS } = require('../services/ai.service');
+const { extractExpense, detectIntent, transcribeAudio, parseExpenseFollowUp, parseDateFromText, normalizeCategoryChoice, CATEGORY_OPTIONS } = require('../services/ai.service');
 const { createExpense } = require('../services/expense.service');
 const { checkLimits, findAllLimits, formatLimits, setLimit } = require('../services/limit.service');
 const { getSocketIo } = require('../socket');
@@ -33,10 +33,12 @@ function isBotReply(text) {
 function getHelpReply() {
   return (
     `🤖 *Como posso ajudar?*\n\n` +
-    `• Registrar gasto: "gastei R$ 35 no almoço"\n` +
+    `• Registrar gasto: "gastei R$ 35 no almoço hoje" ou "gastei R$ 35 no almoço 05/10"\n` +
+    `• Registrar em saúde: "gastei R$ 80 na academia" ou "paguei R$ 45 na farmácia"\n` +
+    `• Registrar no mercado: "gastei R$ 120 no mercado" ou "feira e hortifruti"\n` +
     `• Definir limite: "limite de R$ 300 em lazer"\n` +
     `• Consultar limites: "quais são meus limites?"\n\n` +
-    `Você também pode mandar um áudio. O que gostaria de fazer?`
+    `Se o contexto for óbvio — como almoço, academia, mercado, farmácia — o bot costuma identificar sozinho. Quando não dá para ter certeza, ele pode perguntar.`
   );
 }
 
@@ -56,7 +58,7 @@ function getConfirmationPrompt(expense) {
   const value = Number(expense.valor || 0).toFixed(2);
   const category = expense.categoria || 'outros';
   const date = expense.data || new Date().toISOString().split('T')[0];
-  return `Entendi: gasto de *R$ ${value}* em *${category}* na data *${date}*. Confirmar? Responda *sim* ou *não*.`;
+  return `Entendi: gasto de *R$ ${value}* em *${category}* na data *${date}*. Se a data ou categoria estiverem erradas, mande *1* para categoria ou *2* para data. Se estiver tudo certo, responda *sim*.`;
 }
 
 function getMultiIntentPrompt(actions) {
@@ -134,10 +136,11 @@ async function processMessage(msg, remoteJid, sock) {
   if (textToProcess.startsWith('/ajuda')) {
     const helpText =
       `🤖 *Como me usar:*\n\n` +
-      `1️⃣ *Registrar Gasto:* Basta falar natural, ex: "gastei 50 no bar" ou "paguei 100 de luz".\n\n` +
-      `2️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "limite geral 2000".\n\n` +
-      `3️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
-      `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, assinaturas, lazer, compras, presentes, outros.`;
+      `1️⃣ *Registrar Gasto:* Fale algo natural, por exemplo: "gastei R$ 35 no almoço hoje" ou "gastei R$ 30 na academia 05/10".\n\n` +
+      `2️⃣ *Contexto de categoria:* frases como "almoço", "farmácia", "mercado", "feira", "academia" e "presente" costumam identificar a categoria sem precisar perguntar.\n\n` +
+      `3️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "limite geral 2000".\n\n` +
+      `4️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
+      `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, serviços, lazer, compras, presentes, outros.`;
     await sendMessage(sock, remoteJid, { text: helpText }, { quoted: msg });
     return;
   }
@@ -184,6 +187,18 @@ async function processMessage(msg, remoteJid, sock) {
     }
 
     if (pendingExpense.stage === 'confirm_save') {
+      if (textToProcess.trim() === '1') {
+        pendingExpenseByUser.set(user.id, { ...pendingExpense, stage: 'choose_category' });
+        await sendMessage(sock, remoteJid, { text: getCategorySelectionPrompt() }, { quoted: msg });
+        return;
+      }
+
+      if (textToProcess.trim() === '2') {
+        pendingExpenseByUser.set(user.id, { ...pendingExpense, stage: 'collect_date' });
+        await sendMessage(sock, remoteJid, { text: 'Qual é a data correta? Exemplo: "hoje" ou "07/10".' }, { quoted: msg });
+        return;
+      }
+
       if (isConfirmationPositive(textToProcess)) {
         pendingExpenseByUser.delete(user.id);
         await saveAndBroadcastExpense(user.id, pendingExpense, remoteJid, msg, sock);
@@ -200,10 +215,26 @@ async function processMessage(msg, remoteJid, sock) {
       return;
     }
 
-    const followUpValue = parseExpenseFollowUp(textToProcess);
+    if (pendingExpense.stage === 'collect_date') {
+      const parsedDate = parseDateFromText(textToProcess);
+      if (!/((\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?|hoje|amanh|hje|tomorrow)/i.test(textToProcess)) {
+        await sendMessage(sock, remoteJid, { text: 'Qual é a data correta? Exemplo: "hoje" ou "07/10".' }, { quoted: msg });
+        return;
+      }
+
+      pendingExpenseByUser.set(user.id, {
+        ...pendingExpense,
+        data: parsedDate,
+        stage: 'confirm_save',
+      });
+      await sendMessage(sock, remoteJid, { text: getConfirmationPrompt({ ...pendingExpense, data: parsedDate }) }, { quoted: msg });
+      return;
+    }
+
+    const parsedFollowUp = parseExpenseFollowUp(textToProcess);
     const explicitDate = /((\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?|hoje|amanh|hje|tomorrow)/i.test(textToProcess);
 
-    if (!followUpValue && !explicitDate) {
+    if (!parsedFollowUp && !explicitDate) {
       pendingExpenseByUser.set(user.id, {
         ...pendingExpense,
         stage: 'collect_data',
@@ -212,16 +243,17 @@ async function processMessage(msg, remoteJid, sock) {
       return;
     }
 
-    const resolvedCategory = normalizeCategoryChoice(`${pendingExpense.descricao || ''} ${textToProcess}`);
+    const inferredCategory = normalizeCategoryChoice(`${pendingExpense.descricao || ''} ${textToProcess}`);
+    const categoryFromContext = inferredCategory !== 'outros' ? inferredCategory : pendingExpense.categoria;
     const finalExpense = {
-      valor: followUpValue?.valor ?? pendingExpense.valor ?? 0,
-      categoria: resolvedCategory === 'outros' ? (pendingExpense.categoria || 'outros') : resolvedCategory,
+      valor: pendingExpense.valor ?? parsedFollowUp?.valor ?? 0,
+      categoria: categoryFromContext || 'outros',
       descricao: pendingExpense.descricao || 'Gasto registrado',
-      data: followUpValue?.data ?? new Date().toISOString().split('T')[0],
+      data: parsedFollowUp?.data ?? parseDateFromText(textToProcess) ?? new Date().toISOString().split('T')[0],
       stage: 'confirm_save',
     };
 
-    if (!pendingExpense.categoria || pendingExpense.categoria === 'outros' || resolvedCategory === 'outros') {
+    if ((!pendingExpense.categoria || pendingExpense.categoria === 'outros') && finalExpense.categoria === 'outros') {
       pendingExpenseByUser.set(user.id, {
         ...finalExpense,
         stage: 'choose_category',
@@ -276,9 +308,9 @@ async function processMessage(msg, remoteJid, sock) {
   } else if (intencao === 'REGISTRAR_GASTO') {
     const expenseData = await extractExpense(textToProcess);
     if (!Number.isFinite(Number(expenseData?.valor)) || Number(expenseData.valor) <= 0) {
-      const category = expenseData?.categoria || 'outros';
+      const category = normalizeCategoryChoice(textToProcess) !== 'outros' ? normalizeCategoryChoice(textToProcess) : (expenseData?.categoria || 'outros');
       const description = (expenseData?.descricao || textToProcess.replace(/gastei|paguei|comprei/gi, '').trim()) || 'Gasto';
-      pendingExpenseByUser.set(user.id, { categoria: category, descricao: description, sourceText: textToProcess, stage: 'collect_data' });
+      pendingExpenseByUser.set(user.id, { categoria: category, descricao: description, valor: Number(expenseData?.valor) || null, sourceText: textToProcess, stage: 'collect_data' });
       await sendMessage(sock, remoteJid, {
         text: getPendingExpensePrompt(),
       }, { quoted: msg });
@@ -286,21 +318,28 @@ async function processMessage(msg, remoteJid, sock) {
     }
 
     const hasExplicitDate = /(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?|hoje|amanh|hje|tomorrow)/i.test(textToProcess);
+    const inferredCategory = normalizeCategoryChoice(textToProcess);
+    const category = inferredCategory !== 'outros' ? inferredCategory : (expenseData.categoria || 'outros');
     if (!hasExplicitDate) {
       pendingExpenseByUser.set(user.id, {
-        categoria: expenseData.categoria || 'outros',
+        categoria: category,
         descricao: expenseData.descricao || 'Gasto registrado',
         valor: Number(expenseData.valor),
+        data: new Date().toISOString().split('T')[0],
         sourceText: textToProcess,
-        stage: 'collect_data',
+        stage: 'confirm_save',
       });
       await sendMessage(sock, remoteJid, {
-        text: getMissingDatePrompt(),
+        text: getConfirmationPrompt({
+          valor: Number(expenseData.valor),
+          categoria: category,
+          data: new Date().toISOString().split('T')[0],
+        }),
       }, { quoted: msg });
       return;
     }
 
-    if ((expenseData.categoria || 'outros') === 'outros') {
+    if ((expenseData.categoria || 'outros') === 'outros' && category === 'outros') {
       pendingExpenseByUser.set(user.id, {
         categoria: 'outros',
         descricao: expenseData.descricao || 'Gasto registrado',

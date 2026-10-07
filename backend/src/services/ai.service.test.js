@@ -82,6 +82,34 @@ test('accepts numeric category selection from the prompt list', () => {
   assert.equal(normalizeCategoryChoice('1 alimentação'), 'alimentação');
 });
 
+test('treats date-only input as a date, not as a value', () => {
+  assert.deepEqual(parseExpenseFollowUp('05/10'), {
+    valor: null,
+    data: '2026-10-05'
+  });
+  assert.equal(parseAmountFromText('05/10'), null);
+});
+
+test('infers category from a simple food message when no category is explicitly stated', () => {
+  assert.equal(normalizeCategoryChoice('gastei 30 no almoço'), 'alimentação');
+  assert.equal(normalizeCategoryChoice('gastei 30 na academia'), 'saúde');
+});
+
+test('recognizes real-world food, health, and market contexts before asking for a category', () => {
+  assert.equal(normalizeCategoryChoice('paguei 45 no restaurante'), 'alimentação');
+  assert.equal(normalizeCategoryChoice('comprei suplemento e whey'), 'saúde');
+  assert.equal(normalizeCategoryChoice('gastei 180 na feira e hortifruti'), 'mercado');
+  assert.equal(normalizeCategoryChoice('presente de aniversario para meu pai'), 'presentes');
+  assert.equal(normalizeCategoryChoice('manutenção do aparelho ortodontico'), 'saúde');
+});
+
+test('recognizes explicit value + dental maintenance expense even without a verb like “gastei”', () => {
+  assert.deepEqual(detectIntentLocally('Manutenção aparelho ortodontico R$120'), {
+    intencao: 'REGISTRAR_GASTO',
+    valor: 120
+  });
+});
+
 test('detects when one message mixes a purchase with a limit check', () => {
   assert.deepEqual(detectIntentLocally('gastei 50 no mercado e quero ver meus limites'), {
     intencao: 'MULTIPLE_ACTIONS',

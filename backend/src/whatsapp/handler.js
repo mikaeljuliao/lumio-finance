@@ -44,6 +44,10 @@ function getPendingExpensePrompt() {
   return 'Tudo bem. Qual foi o valor e quando foi? Exemplo: "R$ 80, 05/10" ou "R$ 80, hoje".';
 }
 
+function getMissingDatePrompt() {
+  return 'Tudo bem. Quando foi esse gasto? Exemplo: "hoje" ou "05/10".';
+}
+
 function getCategorySelectionPrompt() {
   return 'Não tenho certeza da categoria. Escolha uma opção:\n' + CATEGORY_OPTIONS.map((category, index) => `${index + 1}. ${category}`).join('\n');
 }
@@ -196,19 +200,24 @@ async function processMessage(msg, remoteJid, sock) {
       return;
     }
 
-    const parsedFollowUp = parseExpenseFollowUp(textToProcess);
-    if (!parsedFollowUp) {
-      pendingExpenseByUser.set(user.id, pendingExpense);
-      await sendMessage(sock, remoteJid, { text: getPendingExpensePrompt() }, { quoted: msg });
+    const followUpValue = parseExpenseFollowUp(textToProcess);
+    const explicitDate = /((\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?|hoje|amanh|hje|tomorrow)/i.test(textToProcess);
+
+    if (!followUpValue && !explicitDate) {
+      pendingExpenseByUser.set(user.id, {
+        ...pendingExpense,
+        stage: 'collect_data',
+      });
+      await sendMessage(sock, remoteJid, { text: getMissingDatePrompt() }, { quoted: msg });
       return;
     }
 
     const resolvedCategory = normalizeCategoryChoice(`${pendingExpense.descricao || ''} ${textToProcess}`);
     const finalExpense = {
-      valor: parsedFollowUp.valor,
+      valor: followUpValue?.valor ?? pendingExpense.valor ?? 0,
       categoria: resolvedCategory === 'outros' ? (pendingExpense.categoria || 'outros') : resolvedCategory,
       descricao: pendingExpense.descricao || 'Gasto registrado',
-      data: parsedFollowUp.data,
+      data: followUpValue?.data ?? new Date().toISOString().split('T')[0],
       stage: 'confirm_save',
     };
 
@@ -281,11 +290,12 @@ async function processMessage(msg, remoteJid, sock) {
       pendingExpenseByUser.set(user.id, {
         categoria: expenseData.categoria || 'outros',
         descricao: expenseData.descricao || 'Gasto registrado',
+        valor: Number(expenseData.valor),
         sourceText: textToProcess,
         stage: 'collect_data',
       });
       await sendMessage(sock, remoteJid, {
-        text: getPendingExpensePrompt(),
+        text: getMissingDatePrompt(),
       }, { quoted: msg });
       return;
     }

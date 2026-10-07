@@ -113,6 +113,22 @@ function normalizeCategoryChoice(text) {
   const normalized = normalizeText(text || '');
   if (!normalized) return 'outros';
 
+  const numericMatch = normalized.match(/^\d+$/);
+  if (numericMatch) {
+    const index = Number(numericMatch[0]) - 1;
+    if (index >= 0 && index < CATEGORY_OPTIONS.length) {
+      return CATEGORY_OPTIONS[index];
+    }
+  }
+
+  const numberedChoice = normalized.match(/^(\d+)\s+(.+)$/);
+  if (numberedChoice) {
+    const selectedIndex = Number(numberedChoice[1]) - 1;
+    if (selectedIndex >= 0 && selectedIndex < CATEGORY_OPTIONS.length) {
+      return CATEGORY_OPTIONS[selectedIndex];
+    }
+  }
+
   const categoryMap = [
     ['alimentacao', 'alimentação'],
     ['saude', 'saúde'],

@@ -113,6 +113,22 @@ function normalizeCategoryChoice(text) {
   const normalized = normalizeText(text || '');
   if (!normalized) return 'outros';
 
+  const numericMatch = normalized.match(/^\d+$/);
+  if (numericMatch) {
+    const index = Number(numericMatch[0]) - 1;
+    if (index >= 0 && index < CATEGORY_OPTIONS.length) {
+      return CATEGORY_OPTIONS[index];
+    }
+  }
+
+  const numberedChoice = normalized.match(/^(\d+)\s+(.+)$/);
+  if (numberedChoice) {
+    const selectedIndex = Number(numberedChoice[1]) - 1;
+    if (selectedIndex >= 0 && selectedIndex < CATEGORY_OPTIONS.length) {
+      return CATEGORY_OPTIONS[selectedIndex];
+    }
+  }
+
   const categoryMap = [
     ['alimentacao', 'alimentação'],
     ['saude', 'saúde'],
@@ -160,9 +176,42 @@ function isSimpleGreeting(text) {
   return /^(oi|ola|opa|eai|e ae|bom dia|boa tarde|boa noite|tudo bem|obrigado|obrigada|valeu)(\s+(lumio|bot|kkk|haha))*$/.test(normalized);
 }
 
+function detectMultipleActionIntent(normalized) {
+  const actions = [];
+
+  const hasLimitQuery = (
+    ((/\b(quais|ver|consultar|mostrar|liste|listar)\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
+    normalized.includes('quanto posso gastar')
+  );
+
+  const hasLimitDefinition = /\blimite\b|\bmaximo\b|\bmaxima\b/.test(normalized);
+  const hasExpenseCue = /\b(gastei|paguei|comprei|custou|anota|registrar|registra|despesa|gasto)\b/.test(normalized);
+  const amount = parseAmountFromText(normalized);
+  const hasKnownCategory = categorizeLocally(normalized) !== 'outros';
+
+  if (hasExpenseCue || (amount !== null && hasKnownCategory)) {
+    actions.push('REGISTRAR_GASTO');
+  }
+
+  if (hasLimitQuery || hasLimitDefinition) {
+    actions.push('VER_LIMITES');
+  }
+
+  if (actions.length > 1) {
+    return { intencao: 'MULTIPLE_ACTIONS', actions: actions.filter((action, index, list) => list.indexOf(action) === index) };
+  }
+
+  return null;
+}
+
 function detectIntentLocally(text) {
   const normalized = normalizeText(text);
   if (isSimpleGreeting(normalized)) return { intencao: 'NAO_ENTENDIDA' };
+
+  const multiActionIntent = detectMultipleActionIntent(normalized);
+  if (multiActionIntent) {
+    return multiActionIntent;
+  }
 
   if (
     ((/\b(quais|ver|consultar|mostrar|liste|listar)\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
@@ -193,7 +242,8 @@ INTENÇÕES POSSÍVEIS:
 1. "REGISTRAR_GASTO": Ex: "gastei 50 no bar", "paguei 100 de luz"
 2. "DEFINIR_LIMITE": Ex: "limite de 500 em lazer", "meu limite geral é 2000", "definir limite 1500", "quero gastar no máximo 300 com mercado"
 3. "VER_LIMITES": Ex: "quais meus limites?", "ver limites", "quanto posso gastar?"
-4. "NAO_ENTENDIDA": Saudações, mensagens sem relação com as funções disponíveis ou pedidos que você não consegue atender.
+4. "MULTIPLE_ACTIONS": Quando a mensagem combina duas ações em uma só frase, como "gastei 50 no mercado e quero ver meus limites".
+5. "NAO_ENTENDIDA": Saudações, mensagens sem relação com as funções disponíveis ou pedidos que você não consegue atender.
 
 Categorias permitidas: ${CATEGORIES_LIST.join(', ')}, geral.
 
@@ -215,8 +265,15 @@ async function detectIntent(text) {
     let resText = response.text().trim();
     resText = resText.replace(/```json/gi, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(resText);
-    const supportedIntents = ['REGISTRAR_GASTO', 'DEFINIR_LIMITE', 'VER_LIMITES', 'NAO_ENTENDIDA'];
-    return supportedIntents.includes(parsed.intencao) ? parsed : detectIntentLocally(text);
+    const supportedIntents = ['REGISTRAR_GASTO', 'DEFINIR_LIMITE', 'VER_LIMITES', 'MULTIPLE_ACTIONS', 'NAO_ENTENDIDA'];
+    if (supportedIntents.includes(parsed.intencao)) {
+      if (parsed.intencao === 'MULTIPLE_ACTIONS') {
+        return { ...parsed, actions: Array.isArray(parsed.actions) ? parsed.actions : [] };
+      }
+      return parsed;
+    }
+
+    return detectIntentLocally(text);
   } catch (e) {
     return detectIntentLocally(text);
   }

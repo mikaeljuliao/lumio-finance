@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { detectIntent, detectIntentLocally, parseAmountFromText, parseExpenseFollowUp, normalizeCategoryChoice, CATEGORY_OPTIONS } = require('./ai.service');
+const { getConfirmationPrompt } = require('../whatsapp/handler');
 
 test('routes a greeting to the unrecognized response without calling Gemini', async () => {
   assert.deepEqual(await detectIntent('Opa!'), { intencao: 'NAO_ENTENDIDA' });
@@ -33,6 +34,29 @@ test('recognizes limit queries', () => {
   assert.deepEqual(detectIntentLocally('Quais são meus limites?'), {
     intencao: 'VER_LIMITES'
   });
+});
+
+test('tolerates typoed limit queries and direct consult requests', () => {
+  assert.deepEqual(detectIntentLocally('quero conlsutar meus liites'), {
+    intencao: 'VER_LIMITES'
+  });
+  assert.deepEqual(detectIntentLocally('quero Consultar meus limites'), {
+    intencao: 'VER_LIMITES'
+  });
+});
+
+test('formats the confirmation prompt in a readable multi-line summary', () => {
+  const prompt = getConfirmationPrompt({
+    valor: 30,
+    categoria: 'transporte',
+    data: '2026-10-07'
+  });
+
+  assert.match(prompt, /Valor: \*R\$ 30\.00\*/i);
+  assert.match(prompt, /Categoria: \*transporte\*/i);
+  assert.match(prompt, /Data: \*2026-10-07\*/i);
+  assert.match(prompt, /Responda: \*sim\* ou \*não\*/i);
+  assert.match(prompt, /Se estiver errado: \*1\* = categoria \| \*2\* = data/i);
 });
 
 test('parses Brazilian currency values in local fallback', () => {

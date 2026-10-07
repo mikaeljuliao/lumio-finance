@@ -39,6 +39,33 @@ function normalizeText(text) {
     .trim();
 }
 
+function normalizeIntentText(text) {
+  let normalized = normalizeText(text);
+
+  const typoReplacements = {
+    conlsutar: 'consultar',
+    conslutar: 'consultar',
+    consltar: 'consultar',
+    conssultar: 'consultar',
+    consultra: 'consultar',
+    conssutar: 'consultar',
+    liites: 'limites',
+    limiites: 'limites',
+    lmites: 'limites',
+    limte: 'limite',
+    limtes: 'limites',
+  };
+
+  for (const [wrong, right] of Object.entries(typoReplacements)) {
+    normalized = normalized.split(wrong).join(right);
+  }
+
+  normalized = normalized.replace(/quais\s+sa?o/g, 'quais');
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+
+  return normalized;
+}
+
 function categorizeLocally(text) {
   const t = normalizeText(text);
   const explicitCategory = CATEGORIES_LIST.find(category =>
@@ -234,8 +261,9 @@ function detectMultipleActionIntent(normalized) {
   const actions = [];
 
   const hasLimitQuery = (
-    ((/\b(quais|ver|consultar|mostrar|liste|listar)\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
-    normalized.includes('quanto posso gastar')
+    ((/\b(quais|ver|consultar|mostrar|liste|listar|visualizar|quero\s+(?:ver|consultar|mostrar|listar))\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
+    normalized.includes('quanto posso gastar') ||
+    /(?:quero|preciso|posso)\s+(?:ver|consultar|saber)\s+(?:meus\s+)?limites?/.test(normalized)
   );
 
   const hasLimitDefinition = /\blimite\b|\bmaximo\b|\bmaxima\b/.test(normalized);
@@ -259,7 +287,7 @@ function detectMultipleActionIntent(normalized) {
 }
 
 function detectIntentLocally(text) {
-  const normalized = normalizeText(text);
+  const normalized = normalizeIntentText(text);
   if (isSimpleGreeting(normalized)) return { intencao: 'NAO_ENTENDIDA' };
 
   const multiActionIntent = detectMultipleActionIntent(normalized);
@@ -268,8 +296,9 @@ function detectIntentLocally(text) {
   }
 
   if (
-    ((/\b(quais|ver|consultar|mostrar|liste|listar)\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
-    normalized.includes('quanto posso gastar')
+    ((/\b(quais|ver|consultar|mostrar|liste|listar|visualizar|quero\s+(?:ver|consultar|mostrar|listar))\b/.test(normalized)) && /\blimites?\b/.test(normalized)) ||
+    normalized.includes('quanto posso gastar') ||
+    /(?:quero|preciso|posso)\s+(?:ver|consultar|saber)\s+(?:meus\s+)?limites?/.test(normalized)
   ) {
     return { intencao: 'VER_LIMITES' };
   }

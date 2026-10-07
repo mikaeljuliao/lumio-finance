@@ -56,7 +56,17 @@ function getConfirmationPrompt(expense) {
   const value = Number(expense.valor || 0).toFixed(2);
   const category = expense.categoria || 'outros';
   const date = expense.data || new Date().toISOString().split('T')[0];
-  return `Entendi: *R$ ${value}* em *${category}* em *${date}*. Correto? *sim* / *não*\nSe estiver errado: *1* categoria ou *2* data.`;
+
+  return [
+    'Entendi:',
+    `• Valor: *R$ ${value}*`,
+    `• Categoria: *${category}*`,
+    `• Data: *${date}*`,
+    '',
+    'Correto?',
+    '• Responda: *sim* ou *não*',
+    '• Se estiver errado: *1* = categoria | *2* = data',
+  ].join('\n');
 }
 
 function getMultiIntentPrompt(actions) {
@@ -68,7 +78,7 @@ function normalizeIntentChoice(text) {
   const normalized = String(text || '').trim().toLowerCase();
   if (!normalized) return null;
   if (/^(gasto|despesa|registrar|registrar gasto|registrar despesa)$/i.test(normalized)) return 'REGISTRAR_GASTO';
-  if (/^(limite|limites|consultar|consultar limites|ver limites|ver)$/i.test(normalized)) return 'VER_LIMITES';
+  if (/^(limite|limites|consultar|consultar limites|ver limites|ver|quero consultar meus limites|quero ver meus limites|quais meus limites)$/i.test(normalized) || /(consultar|ver|mostrar|listar).*(limites?)/i.test(normalized)) return 'VER_LIMITES';
   return null;
 }
 
@@ -426,4 +436,4 @@ async function sendMessage(sock, jid, content, options = {}) {
   }
 }
 
-module.exports = { processMessage, sentMessageIds };
+module.exports = { processMessage, sentMessageIds, getConfirmationPrompt };

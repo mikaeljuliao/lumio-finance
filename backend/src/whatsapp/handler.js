@@ -33,12 +33,10 @@ function isBotReply(text) {
 function getHelpReply() {
   return (
     `🤖 *Como posso ajudar?*\n\n` +
-    `• Registrar gasto: "gastei R$ 35 no almoço hoje" ou "gastei R$ 35 no almoço 05/10"\n` +
-    `• Registrar em saúde: "gastei R$ 80 na academia" ou "paguei R$ 45 na farmácia"\n` +
-    `• Registrar no mercado: "gastei R$ 120 no mercado" ou "feira e hortifruti"\n` +
-    `• Definir limite: "limite de R$ 300 em lazer"\n` +
-    `• Consultar limites: "quais são meus limites?"\n\n` +
-    `Se o contexto for óbvio — como almoço, academia, mercado, farmácia — o bot costuma identificar sozinho. Quando não dá para ter certeza, ele pode perguntar.`
+    `• Gasto: "gastei R$ 35 no almoço hoje"\n` +
+    `• Limite: "limite de R$ 300 em lazer"\n` +
+    `• Consultar: "quais meus limites?"\n\n` +
+    `Se o contexto for claro, eu identifico sozinho.`
   );
 }
 
@@ -58,7 +56,7 @@ function getConfirmationPrompt(expense) {
   const value = Number(expense.valor || 0).toFixed(2);
   const category = expense.categoria || 'outros';
   const date = expense.data || new Date().toISOString().split('T')[0];
-  return `Entendi: gasto de *R$ ${value}* em *${category}* na data *${date}*. Se a data ou categoria estiverem erradas, mande *1* para categoria ou *2* para data. Se estiver tudo certo, responda *sim*.`;
+  return `Entendi: *R$ ${value}* em *${category}* em *${date}*. Correto? *sim* / *não*\nSe estiver errado: *1* categoria ou *2* data.`;
 }
 
 function getMultiIntentPrompt(actions) {
@@ -136,11 +134,10 @@ async function processMessage(msg, remoteJid, sock) {
   if (textToProcess.startsWith('/ajuda')) {
     const helpText =
       `🤖 *Como me usar:*\n\n` +
-      `1️⃣ *Registrar Gasto:* Fale algo natural, por exemplo: "gastei R$ 35 no almoço hoje" ou "gastei R$ 30 na academia 05/10".\n\n` +
-      `2️⃣ *Contexto de categoria:* frases como "almoço", "farmácia", "mercado", "feira", "academia" e "presente" costumam identificar a categoria sem precisar perguntar.\n\n` +
-      `3️⃣ *Definir Limites:* Fale "meu limite de mercado é 1000" ou "limite geral 2000".\n\n` +
-      `4️⃣ *Consultar:* Fale "quais meus limites?" ou "quanto já gastei?".\n\n` +
-      `📊 *Categorias:* alimentação, transporte, saúde, mercado, moradia, educação, serviços, lazer, compras, presentes, outros.`;
+      `1️⃣ *Gasto:* "gastei R$ 35 no almoço hoje"\n` +
+      `2️⃣ *Limite:* "meu limite de mercado é 1000"\n` +
+      `3️⃣ *Consulta:* "quais meus limites?"\n\n` +
+      `Se o contexto for claro, eu identifico sozinho.`;
     await sendMessage(sock, remoteJid, { text: helpText }, { quoted: msg });
     return;
   }
@@ -195,7 +192,7 @@ async function processMessage(msg, remoteJid, sock) {
 
       if (textToProcess.trim() === '2') {
         pendingExpenseByUser.set(user.id, { ...pendingExpense, stage: 'collect_date' });
-        await sendMessage(sock, remoteJid, { text: 'Qual é a data correta? Exemplo: "hoje" ou "07/10".' }, { quoted: msg });
+        await sendMessage(sock, remoteJid, { text: 'Data correta? Ex: "hoje" ou "07/10".' }, { quoted: msg });
         return;
       }
 
@@ -243,7 +240,7 @@ async function processMessage(msg, remoteJid, sock) {
       return;
     }
 
-    const inferredCategory = normalizeCategoryChoice(`${pendingExpense.descricao || ''} ${textToProcess}`);
+    const inferredCategory = normalizeCategoryChoice(textToProcess);
     const categoryFromContext = inferredCategory !== 'outros' ? inferredCategory : pendingExpense.categoria;
     const finalExpense = {
       valor: pendingExpense.valor ?? parsedFollowUp?.valor ?? 0,

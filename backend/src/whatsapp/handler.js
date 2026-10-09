@@ -52,6 +52,14 @@ function getCategorySelectionPrompt() {
   return 'Não tenho certeza da categoria. Escolha uma opção:\n' + CATEGORY_OPTIONS.map((category, index) => `${index + 1}. ${category}`).join('\n');
 }
 
+function formatDateForDisplay(date) {
+  const match = String(date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return date;
+
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
 function getConfirmationPrompt(expense) {
   const value = Number(expense.valor || 0).toFixed(2);
   const category = expense.categoria || 'outros';
@@ -61,7 +69,7 @@ function getConfirmationPrompt(expense) {
     'Entendi:',
     `• Valor: *R$ ${value}*`,
     `• Categoria: *${category}*`,
-    `• Data: *${date}*`,
+    `• Data: *${formatDateForDisplay(date)}*`,
     '',
     'Correto?',
     '• Responda: *sim* ou *não*',

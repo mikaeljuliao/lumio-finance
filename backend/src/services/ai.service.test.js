@@ -54,7 +54,7 @@ test('formats the confirmation prompt in a readable multi-line summary', () => {
 
   assert.match(prompt, /Valor: \*R\$ 30\.00\*/i);
   assert.match(prompt, /Categoria: \*transporte\*/i);
-  assert.match(prompt, /Data: \*2026-10-07\*/i);
+  assert.match(prompt, /Data: \*07\/10\/2026\*/i);
   assert.match(prompt, /Responda: \*sim\* ou \*não\*/i);
   assert.match(prompt, /Se estiver errado: \*1\* = categoria \| \*2\* = data/i);
 });

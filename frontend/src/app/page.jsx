@@ -32,33 +32,41 @@ export default function Home() {
     ano: new Date().getFullYear()
   });
 
-  const checkSession = useCallback(async () => {
-    setIsAuthChecking(true);
-    try {
-      const res = await authFetch(`${API_BASE}/api/auth/me`);
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-      } else {
-        setUser(null);
-      }
-    } catch (err) {
-      setUser(null);
-    } finally {
-      setIsAuthChecking(false);
-    }
-  }, []);
-
   useEffect(() => {
-    checkSession();
-  }, [checkSession]);
+    let isMounted = true;
+
+    authFetch(`${API_BASE}/api/auth/me`)
+      .then(async (res) => {
+        if (!isMounted) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) setUser(data.user);
+        } else {
+          setUser(null);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setUser(null);
+      })
+      .finally(() => {
+        if (isMounted) setIsAuthChecking(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [API_BASE]);
+
+  const handleSessionExpired = useCallback(() => {
+    clearSessionToken();
+    setUser(null);
+  }, []);
 
   const {
     filteredExpenses,
     limits,
     stats,
     isLoading,
-    error,
     addExpense,
     addExpenseFromSocket,
     updateExpense,
@@ -66,21 +74,14 @@ export default function Home() {
     clearExpenses,
     setLimit,
     removeLimit,
-  } = useExpenses(dateFilter, Boolean(user));
+  } = useExpenses(dateFilter, Boolean(user), handleSessionExpired);
 
   useWhatsAppSocket(user ? addExpenseFromSocket : null);
-
-  useEffect(() => {
-    if (error === "SESSION_EXPIRED") {
-      clearSessionToken();
-      setUser(null);
-    }
-  }, [error]);
 
   const handleLogout = async () => {
     try {
       await authFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
-    } catch (e) {}
+    } catch {}
     clearSessionToken();
     setUser(null);
   };
@@ -237,6 +238,7 @@ export default function Home() {
       />
 
       <EditTransactionModal
+        key={editingExpense?.id ?? "closed"}
         isOpen={Boolean(editingExpense)}
         gasto={editingExpense}
         onClose={() => setEditingExpense(null)}
@@ -244,6 +246,7 @@ export default function Home() {
       />
 
       <LimitModal
+        key={`${limitModalState.isOpen}-${limitModalState.categoria}`}
         isOpen={limitModalState.isOpen}
         categoria={limitModalState.categoria}
         valorInicial={limitModalState.valor}

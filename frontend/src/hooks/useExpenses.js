@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, startTransition } from "react";
 import { calculateStats } from "../lib/utils";
 import { getApiBaseUrl, authFetch } from "../lib/config";
 
-export function useExpenses(dateFilter, isAuthenticated = true) {
+export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired) {
   const API_BASE = getApiBaseUrl();
   const [expenses, setExpenses] = useState([]);
   const [limits, setLimits] = useState({});
@@ -10,57 +10,87 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
   const [error, setError] = useState(null);
 
   const fetchExpensesAndLimits = useCallback(async () => {
-    if (!isAuthenticated) {
-      setIsLoading(false);
+    if (!isAuthenticated) return null;
+
+    const [resExpenses, resLimits] = await Promise.all([
+      authFetch(`${API_BASE}/api/gastos`),
+      authFetch(`${API_BASE}/api/limites`),
+    ]);
+
+    if (resExpenses.status === 401 || resLimits.status === 401) {
+      return { sessionExpired: true };
+    }
+
+    const [dataExpenses, dataLimits] = await Promise.all([
+      resExpenses.ok ? resExpenses.json() : null,
+      resLimits.ok ? resLimits.json() : null,
+    ]);
+
+    return {
+      expenses: Array.isArray(dataExpenses)
+        ? dataExpenses.map((g) => ({
+            id: g.id,
+            valor: Number(g.valor),
+            categoria: g.categoria || "outros",
+            descricao: g.descricao || "Sem descrição",
+            data: g.data ? String(g.data).split("T")[0] : new Date().toISOString().split("T")[0],
+            created_at: g.criadoEm || g.created_at || new Date().toISOString(),
+          }))
+        : null,
+      limits: dataLimits && typeof dataLimits === "object" && !Array.isArray(dataLimits)
+        ? dataLimits
+        : null,
+    };
+  }, [API_BASE, isAuthenticated]);
+
+  const applyFetchedData = useCallback((result) => {
+    if (!result) return;
+    if (result.sessionExpired) {
+      setError("SESSION_EXPIRED");
+      onSessionExpired?.();
       return;
     }
-    setIsLoading(true);
+
     setError(null);
-    try {
-      const [resExpenses, resLimits] = await Promise.all([
-        authFetch(`${API_BASE}/api/gastos`),
-        authFetch(`${API_BASE}/api/limites`),
-      ]);
+    if (result.expenses) setExpenses(result.expenses);
+    if (result.limits) setLimits(result.limits);
+  }, [onSessionExpired]);
 
-      if (resExpenses.status === 401 || resLimits.status === 401) {
-        setError("SESSION_EXPIRED");
-        setIsLoading(false);
-        return;
-      }
-
-      if (resExpenses.ok) {
-        const dataExpenses = await resExpenses.json();
-        if (Array.isArray(dataExpenses)) {
-          setExpenses(
-            dataExpenses.map((g) => ({
-              id: g.id,
-              valor: Number(g.valor),
-              categoria: g.categoria || "outros",
-              descricao: g.descricao || "Sem descrição",
-              data: g.data ? String(g.data).split("T")[0] : new Date().toISOString().split("T")[0],
-              created_at: g.criadoEm || g.created_at || new Date().toISOString(),
-            }))
-          );
-        }
-      }
-
-      if (resLimits.ok) {
-        const dataLimits = await resLimits.json();
-        if (dataLimits && typeof dataLimits === "object" && !Array.isArray(dataLimits)) {
-          setLimits(dataLimits);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching data from backend:", err);
-      setError("Unable to load data.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated]);
+  const handleFetchError = useCallback((err) => {
+    console.error("Error fetching data from backend:", err);
+    setError("Unable to load data.");
+  }, []);
 
   useEffect(() => {
-    fetchExpensesAndLimits();
-  }, [fetchExpensesAndLimits]);
+    if (!isAuthenticated) return undefined;
+
+    startTransition(() => setIsLoading(true));
+    let isActive = true;
+    fetchExpensesAndLimits()
+      .then((result) => {
+        if (isActive) applyFetchedData(result);
+      })
+      .catch((err) => {
+        if (isActive) handleFetchError(err);
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [applyFetchedData, fetchExpensesAndLimits, handleFetchError, isAuthenticated]);
+
+  const refetch = useCallback(() => {
+    if (!isAuthenticated) return;
+    setIsLoading(true);
+    setError(null);
+    return fetchExpensesAndLimits()
+      .then(applyFetchedData)
+      .catch(handleFetchError)
+      .finally(() => setIsLoading(false));
+  }, [applyFetchedData, fetchExpensesAndLimits, handleFetchError, isAuthenticated]);
 
   const addExpense = useCallback(async (newExpense) => {
     const formatted = {
@@ -86,7 +116,7 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     } catch (err) {
       console.error("Error saving expense to backend:", err);
     }
-  }, []);
+  }, [API_BASE]);
 
   const addExpenseFromSocket = useCallback((expense) => {
     const formatted = {
@@ -116,7 +146,7 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     } catch (err) {
       console.error("Error updating expense in backend:", err);
     }
-  }, []);
+  }, [API_BASE]);
 
   const deleteExpense = useCallback(async (id) => {
     setExpenses((prev) => prev.filter((g) => g.id !== id));
@@ -125,7 +155,7 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     } catch (err) {
       console.error("Error deleting expense in backend:", err);
     }
-  }, []);
+  }, [API_BASE]);
 
   const clearExpenses = useCallback(async () => {
     setExpenses([]);
@@ -136,7 +166,7 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     } catch (err) {
       console.error("Error clearing expenses in backend:", err);
     }
-  }, [dateFilter]);
+  }, [API_BASE, dateFilter]);
 
   const setLimit = useCallback(async (category, amount) => {
     const catClean = (category || "geral").toLowerCase().trim();
@@ -151,7 +181,7 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     } catch (err) {
       console.error("Error setting limit in backend:", err);
     }
-  }, []);
+  }, [API_BASE]);
 
   const removeLimit = useCallback(async (category) => {
     const catClean = (category || "geral").toLowerCase().trim();
@@ -167,7 +197,7 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     } catch (err) {
       console.error("Error removing limit in backend:", err);
     }
-  }, []);
+  }, [API_BASE]);
 
   const parseExpenseYearMonth = (dateStr) => {
     if (!dateStr) return { ano: null, mes: null };
@@ -220,6 +250,6 @@ export function useExpenses(dateFilter, isAuthenticated = true) {
     clearExpenses,
     setLimit,
     removeLimit,
-    refetch: fetchExpensesAndLimits,
+    refetch,
   };
 }

@@ -80,7 +80,7 @@ export function Header({
 
           <button
             onClick={onLogout}
-            className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/80 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 border-zinc-800 hover:border-red-500/20 transition-all text-xs font-bold cursor-pointer"
+            className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/80 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 hover:border-red-500/20 transition-all text-xs font-bold cursor-pointer"
             title="Encerrar sessão"
           >
             <LogOut className="w-4 h-4" />

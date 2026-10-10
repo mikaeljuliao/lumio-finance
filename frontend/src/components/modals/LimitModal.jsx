@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Sliders, Trash2 } from "lucide-react";
 import { parseCurrencyInput } from "../../lib/utils";
 
@@ -12,13 +12,6 @@ export function LimitModal({
 }) {
   const [amount, setAmount] = useState(valorInicial);
   const [amountError, setAmountError] = useState("");
-
-  useEffect(() => {
-    if (isOpen) {
-      setAmount(valorInicial);
-      setAmountError("");
-    }
-  }, [isOpen, valorInicial]);
 
   if (!isOpen) return null;
 

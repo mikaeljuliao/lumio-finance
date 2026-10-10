@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Sliders, Trash2 } from "lucide-react";
 
 export function LimitModal({
@@ -10,10 +10,6 @@ export function LimitModal({
   onRemove
 }) {
   const [amount, setAmount] = useState(valorInicial);
-
-  useEffect(() => {
-    setAmount(valorInicial);
-  }, [valorInicial]);
 
   if (!isOpen) return null;
 

@@ -1,13 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Edit3, Calendar, DollarSign, Tag, FileText } from "lucide-react";
 import { CATEGORIES } from "../../lib/constants";
 
 export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
   const [formData, setFormData] = useState(gasto);
-
-  useEffect(() => {
-    setFormData(gasto);
-  }, [gasto]);
 
   if (!isOpen || !formData) return null;
 

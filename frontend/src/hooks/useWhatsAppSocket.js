@@ -47,7 +47,6 @@ export function useWhatsAppSocket(onNewExpense) {
       socketRef.current = null;
     };
   // Only run once — stable socket lifecycle
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { isSocketConnected };

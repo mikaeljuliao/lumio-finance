@@ -2,7 +2,7 @@ import { Plus, MessageSquare, Zap } from "lucide-react";
 
 export function QuickActionBar({ onOpenAddModal, onOpenWhatsAppModal }) {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-gradient-to-r from-zinc-900/90 via-zinc-900 to-zinc-950 border border-zinc-800/80 p-3 sm:p-4 rounded-2xl shadow-lg backdrop-blur-sm">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-linear-to-r from-zinc-900/90 via-zinc-900 to-zinc-950 border border-zinc-800/80 p-3 sm:p-4 rounded-2xl shadow-lg backdrop-blur-sm">
       <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-300 font-bold uppercase tracking-wider pl-1">
         <Zap className="w-3.5 h-3.5 text-emerald-400" />
         <span>Registrar Gasto:</span>

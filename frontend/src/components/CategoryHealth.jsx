@@ -57,6 +57,7 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
         <div className="flex items-center gap-1 bg-zinc-950/80 border border-zinc-800/80 p-1 rounded-xl self-start sm:self-auto">
           <button
             onClick={() => setFilterMode("all")}
+            aria-pressed={filterMode === "all"}
             className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
               filterMode === "all"
                 ? "bg-zinc-800 text-white"
@@ -67,6 +68,7 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
           </button>
           <button
             onClick={() => setFilterMode("limits")}
+            aria-pressed={filterMode === "limits"}
             className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
               filterMode === "limits"
                 ? "bg-zinc-800 text-emerald-400"
@@ -77,6 +79,7 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
           </button>
           <button
             onClick={() => setFilterMode("alerts")}
+            aria-pressed={filterMode === "alerts"}
             className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
               filterMode === "alerts"
                 ? "bg-zinc-800 text-amber-400"
@@ -90,7 +93,34 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
 
       {/* Categories Cards Responsive Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-        {filteredCategories.map((cat) => {
+        {filteredCategories.length === 0 ? (
+          <div className="col-span-full rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 px-4 py-8 text-center" aria-live="polite">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800/80 text-emerald-400">
+              {filterMode === "alerts" && categoryList.some((cat) => cat.hasLimit) ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <SlidersHorizontal className="h-5 w-5" />
+              )}
+            </div>
+            <p className="mt-3 text-sm font-bold text-zinc-200">
+              {filterMode === "alerts" && categoryList.some((cat) => cat.hasLimit)
+                ? "Nenhum limite em alerta"
+                : "Nenhum limite por categoria definido"}
+            </p>
+            <p className="mx-auto mt-1 max-w-xs text-xs text-zinc-400">
+              {filterMode === "alerts" && categoryList.some((cat) => cat.hasLimit)
+                ? "Todas as categorias estão abaixo de 80% do limite."
+                : "Veja as categorias e escolha onde quer definir um limite mensal."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setFilterMode("all")}
+              className="mt-4 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-200 transition-colors hover:border-emerald-500/40 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+            >
+              Ver todas as categorias
+            </button>
+          </div>
+        ) : filteredCategories.map((cat) => {
           const getBarColor = () => {
             if (!cat.hasLimit) return "bg-zinc-700";
             if (cat.isOver) return "bg-red-500";
@@ -111,7 +141,16 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
             <div
               key={cat.id}
               onClick={() => onOpenLimitModal(cat.id, cat.limit)}
-              className="group bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 p-3.5 rounded-2xl cursor-pointer transition-all space-y-2.5 min-w-0"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onOpenLimitModal(cat.id, cat.limit);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Editar limite de ${cat.id}`}
+              className="group bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 p-3.5 rounded-2xl cursor-pointer transition-all space-y-2.5 min-w-0"
             >
               {/* Category Header */}
               <div className="flex items-center justify-between gap-2 min-w-0">

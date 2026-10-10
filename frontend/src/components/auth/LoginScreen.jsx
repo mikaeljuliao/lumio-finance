@@ -36,7 +36,7 @@ export function LoginScreen({ onLoginSuccess }) {
       } else {
         setError(data.error || "Erro ao acessar a conta");
       }
-    } catch (err) {
+    } catch {
       setError("Falha ao conectar com o servidor");
     } finally {
       setIsLoading(false);

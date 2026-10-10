@@ -1,4 +1,4 @@
-import { Trash2, AlertTriangle, X } from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
 
 export function ConfirmModal({
   isOpen,

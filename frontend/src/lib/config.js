@@ -20,10 +20,10 @@ export function saveSessionToken(token) {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(SESSION_KEY, token);
-    } catch (e) {}
+    } catch {}
     try {
       document.cookie = `${SESSION_KEY}=${encodeURIComponent(token)}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
-    } catch (e) {}
+    } catch {}
   }
 }
 
@@ -37,7 +37,7 @@ export function getSessionToken() {
       memoryToken = fromStorage;
       return fromStorage;
     }
-  } catch (e) {}
+  } catch {}
 
   try {
     const cookies = document.cookie.split(";");
@@ -49,7 +49,7 @@ export function getSessionToken() {
         return decoded;
       }
     }
-  } catch (e) {}
+  } catch {}
 
   return null;
 }
@@ -59,10 +59,10 @@ export function clearSessionToken() {
   if (typeof window !== "undefined") {
     try {
       localStorage.removeItem(SESSION_KEY);
-    } catch (e) {}
+    } catch {}
     try {
       document.cookie = `${SESSION_KEY}=; path=/; max-age=0; SameSite=Lax`;
-    } catch (e) {}
+    } catch {}
   }
 }
 

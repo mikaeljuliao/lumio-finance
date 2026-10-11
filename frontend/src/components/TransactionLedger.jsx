@@ -22,6 +22,7 @@ export function TransactionLedger({
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [minimumAmount, setMinimumAmount] = useState("");
   const [maximumAmount, setMaximumAmount] = useState("");
+  const [sortMode, setSortMode] = useState("date-desc");
 
   const filteredTransactions = useMemo(() => {
     const minimumValue = minimumAmount.trim() ? parseCurrencyInput(minimumAmount) : null;
@@ -47,8 +48,19 @@ export function TransactionLedger({
   );
 
   const groupedData = useMemo(() => {
-    return groupTransactionsByDate(filteredTransactions);
-  }, [filteredTransactions]);
+    const groups = groupTransactionsByDate(filteredTransactions);
+    if (sortMode === "date-asc") return groups.reverse();
+    if (sortMode === "amount-desc" || sortMode === "amount-asc") {
+      return groups.map((group) => ({
+        ...group,
+        items: [...group.items].sort((first, second) => {
+          const difference = Number(first.valor || 0) - Number(second.valor || 0);
+          return sortMode === "amount-desc" ? -difference : difference;
+        })
+      }));
+    }
+    return groups;
+  }, [filteredTransactions, sortMode]);
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedCategory !== "all" ||
@@ -171,6 +183,18 @@ export function TransactionLedger({
               className="w-20 bg-zinc-950/80 border border-zinc-800 rounded-xl px-2.5 py-2 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/80"
             />
           </div>
+
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value)}
+            aria-label="Ordenar lançamentos por data ou valor dentro do dia"
+            className="bg-zinc-950/80 border border-zinc-800 rounded-xl px-2.5 py-2 text-xs text-zinc-300 outline-none focus:border-emerald-500/80 cursor-pointer"
+          >
+            <option value="date-desc">Recentes</option>
+            <option value="date-asc">Antigos</option>
+            <option value="amount-desc">Maior valor/dia</option>
+            <option value="amount-asc">Menor valor/dia</option>
+          </select>
 
           <button
             type="button"

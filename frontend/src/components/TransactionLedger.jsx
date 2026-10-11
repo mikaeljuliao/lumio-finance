@@ -1,7 +1,13 @@
 import { useState, useMemo } from "react";
-import { Search, Filter, Trash2, Edit3, ReceiptText, Plus, X } from "lucide-react";
+import { Search, Filter, Trash2, Edit3, ReceiptText, Plus, X, Download } from "lucide-react";
 import { CATEGORIES, CATEGORY_ICON_MAP } from "../lib/constants";
-import { formatCurrency, groupTransactionsByDate } from "../lib/utils";
+import { formatCurrency, formatDate, groupTransactionsByDate } from "../lib/utils";
+
+function escapeCsvField(value) {
+  const text = String(value ?? "");
+  const safeText = /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+}
 
 export function TransactionLedger({
   transactions,
@@ -30,6 +36,41 @@ export function TransactionLedger({
     return groupTransactionsByDate(filteredTransactions);
   }, [filteredTransactions]);
   const hasActiveFilters = searchQuery.trim().length > 0 || selectedCategory !== "all";
+
+  const handleExport = () => {
+    if (filteredTransactions.length === 0 || isLoading) return;
+
+    const rows = [
+      ["Data", "Descrição", "Categoria", "Valor"],
+      ...filteredTransactions.map((item) => [
+        formatDate(item.data),
+        item.descricao,
+        item.categoria,
+        Number(item.valor || 0).toFixed(2).replace(".", ",")
+      ])
+    ];
+    const csv = rows
+      .map((row) => row.map(escapeCsvField).join(";"))
+      .join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const monthSlug = monthName
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const firstTransactionYear = String(filteredTransactions[0].data || "").slice(0, 4);
+    const year = /^\d{4}$/.test(firstTransactionYear)
+      ? firstTransactionYear
+      : new Date().getFullYear();
+
+    link.href = url;
+    link.download = `lumio-gastos-${monthSlug}-${year}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   return (
     <section className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 space-y-6">
@@ -91,6 +132,18 @@ export function TransactionLedger({
             </select>
             <Filter className="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={isLoading || filteredTransactions.length === 0}
+            className="p-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 rounded-xl border border-zinc-800 transition-colors text-xs font-bold flex items-center gap-1.5 shrink-0"
+            title={`Exportar ${filteredTransactions.length} lançamentos filtrados como CSV`}
+            aria-label={`Exportar ${filteredTransactions.length} lançamentos filtrados como CSV`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">CSV</span>
+          </button>
 
           {transactions.length > 0 && (
             <button

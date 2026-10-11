@@ -67,6 +67,13 @@ export function TransactionLedger({
     minimumAmount.trim().length > 0 ||
     maximumAmount.trim().length > 0;
 
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory("all");
+    setMinimumAmount("");
+    setMaximumAmount("");
+  };
+
   const handleExport = () => {
     if (filteredTransactions.length === 0 || isLoading) return;
 
@@ -208,6 +215,19 @@ export function TransactionLedger({
             <span className="hidden sm:inline">CSV</span>
           </button>
 
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl border border-zinc-800 transition-colors text-xs font-bold flex items-center gap-1.5 shrink-0"
+              title="Limpar filtros do histórico"
+              aria-label="Limpar filtros do histórico"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Limpar filtros</span>
+            </button>
+          )}
+
           {transactions.length > 0 && (
             <button
               onClick={onClearAll}
@@ -245,12 +265,7 @@ export function TransactionLedger({
           </p>
           {hasActiveFilters ? (
             <button
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedCategory("all");
-                setMinimumAmount("");
-                setMaximumAmount("");
-              }}
+              onClick={clearFilters}
               className="inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500/40 text-zinc-200 hover:text-emerald-300 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
             >
               <X className="w-3.5 h-3.5" />

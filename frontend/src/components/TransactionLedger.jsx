@@ -31,6 +31,10 @@ export function TransactionLedger({
       return matchesSearch && matchesCategory;
     });
   }, [transactions, searchQuery, selectedCategory]);
+  const filteredTotal = filteredTransactions.reduce(
+    (total, item) => total + Number(item.valor || 0),
+    0
+  );
 
   const groupedData = useMemo(() => {
     return groupTransactionsByDate(filteredTransactions);
@@ -89,7 +93,7 @@ export function TransactionLedger({
               </span>
             </div>
             <p className="text-xs text-zinc-400">
-              Movimentações de {monthName}
+              Movimentações de {monthName} · Total filtrado {formatCurrency(filteredTotal)}
             </p>
           </div>
         </div>

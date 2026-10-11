@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Search, Filter, Trash2, Edit3, ReceiptText, Plus, X, Download } from "lucide-react";
 import { CATEGORIES, CATEGORY_ICON_MAP } from "../lib/constants";
-import { formatCurrency, formatDate, groupTransactionsByDate } from "../lib/utils";
+import { formatCurrency, formatDate, groupTransactionsByDate, parseCurrencyInput } from "../lib/utils";
 
 function escapeCsvField(value) {
   const text = String(value ?? "");
@@ -20,17 +20,27 @@ export function TransactionLedger({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [minimumAmount, setMinimumAmount] = useState("");
+  const [maximumAmount, setMaximumAmount] = useState("");
 
   const filteredTransactions = useMemo(() => {
+    const minimumValue = minimumAmount.trim() ? parseCurrencyInput(minimumAmount) : null;
+    const maximumValue = maximumAmount.trim() ? parseCurrencyInput(maximumAmount) : null;
+
     return transactions.filter((item) => {
       const matchesSearch =
         (item.descricao || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.categoria || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory =
         selectedCategory === "all" || item.categoria === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const amount = Number(item.valor || 0);
+      const matchesMinimum =
+        !minimumAmount.trim() || (minimumValue !== null && amount >= minimumValue);
+      const matchesMaximum =
+        !maximumAmount.trim() || (maximumValue !== null && amount <= maximumValue);
+      return matchesSearch && matchesCategory && matchesMinimum && matchesMaximum;
     });
-  }, [transactions, searchQuery, selectedCategory]);
+  }, [transactions, searchQuery, selectedCategory, minimumAmount, maximumAmount]);
   const filteredTotal = filteredTransactions.reduce(
     (total, item) => total + Number(item.valor || 0),
     0
@@ -39,7 +49,11 @@ export function TransactionLedger({
   const groupedData = useMemo(() => {
     return groupTransactionsByDate(filteredTransactions);
   }, [filteredTransactions]);
-  const hasActiveFilters = searchQuery.trim().length > 0 || selectedCategory !== "all";
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
+    selectedCategory !== "all" ||
+    minimumAmount.trim().length > 0 ||
+    maximumAmount.trim().length > 0;
 
   const handleExport = () => {
     if (filteredTransactions.length === 0 || isLoading) return;
@@ -137,6 +151,27 @@ export function TransactionLedger({
             <Filter className="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
+          <div className="flex shrink-0 items-center gap-1.5">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={minimumAmount}
+              onChange={(e) => setMinimumAmount(e.target.value)}
+              placeholder="Mín. R$"
+              aria-label="Valor mínimo do gasto"
+              className="w-20 bg-zinc-950/80 border border-zinc-800 rounded-xl px-2.5 py-2 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/80"
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={maximumAmount}
+              onChange={(e) => setMaximumAmount(e.target.value)}
+              placeholder="Máx. R$"
+              aria-label="Valor máximo do gasto"
+              className="w-20 bg-zinc-950/80 border border-zinc-800 rounded-xl px-2.5 py-2 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/80"
+            />
+          </div>
+
           <button
             type="button"
             onClick={handleExport}
@@ -189,6 +224,8 @@ export function TransactionLedger({
               onClick={() => {
                 setSearchQuery("");
                 setSelectedCategory("all");
+                setMinimumAmount("");
+                setMaximumAmount("");
               }}
               className="inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500/40 text-zinc-200 hover:text-emerald-300 px-3.5 py-2 rounded-xl text-xs font-bold transition-all mt-1"
             >

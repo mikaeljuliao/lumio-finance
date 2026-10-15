@@ -222,15 +222,42 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   }, [API_BASE, expenses, onSessionExpired]);
 
   const clearExpenses = useCallback(async () => {
-    setExpenses([]);
+    const isExpenseInMonth = (expense) => {
+      const [year, month] = String(expense.data || "").split("T")[0].split("-");
+      return Number(year) === dateFilter.ano && Number(month) === dateFilter.mes + 1;
+    };
+    const removedExpenses = expenses
+      .map((expense, index) => ({ expense, index }))
+      .filter(({ expense }) => isExpenseInMonth(expense));
+
+    setExpenses((current) =>
+      current.filter((expense) => !isExpenseInMonth(expense))
+    );
+
     try {
-      await authFetch(`${API_BASE}/api/gastos?mes=${dateFilter.mes + 1}&ano=${dateFilter.ano}`, {
-        method: "DELETE",
+      await requestApi(
+        `${API_BASE}/api/gastos?mes=${dateFilter.mes + 1}&ano=${dateFilter.ano}`,
+        { method: "DELETE" },
+        "Não foi possível limpar os gastos deste mês.",
+        onSessionExpired
+      );
+    } catch (error) {
+      setExpenses((current) => {
+        const currentIds = new Set(current.map((expense) => expense.id));
+        const missingExpenses = removedExpenses.filter(
+          ({ expense }) => !currentIds.has(expense.id)
+        );
+        const restored = [...current];
+
+        for (const { expense, index } of missingExpenses) {
+          restored.splice(Math.min(index, restored.length), 0, expense);
+        }
+
+        return restored;
       });
-    } catch (err) {
-      console.error("Error clearing expenses in backend:", err);
+      throw error;
     }
-  }, [API_BASE, dateFilter]);
+  }, [API_BASE, dateFilter, expenses, onSessionExpired]);
 
   const setLimit = useCallback(async (category, amount) => {
     const catClean = (category || "geral").toLowerCase().trim();

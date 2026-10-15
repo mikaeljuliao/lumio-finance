@@ -196,13 +196,30 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   }, [API_BASE, expenses, onSessionExpired]);
 
   const deleteExpense = useCallback(async (id) => {
+    const previousIndex = expenses.findIndex((expense) => expense.id === id);
+    const previousExpense = expenses[previousIndex];
+    if (!previousExpense) {
+      throw new Error("Este gasto não está mais disponível para exclusão.");
+    }
+
     setExpenses((prev) => prev.filter((g) => g.id !== id));
     try {
-      await authFetch(`${API_BASE}/api/gastos/${id}`, { method: "DELETE" });
-    } catch (err) {
-      console.error("Error deleting expense in backend:", err);
+      await requestApi(
+        `${API_BASE}/api/gastos/${id}`,
+        { method: "DELETE" },
+        "Não foi possível excluir o gasto.",
+        onSessionExpired
+      );
+    } catch (error) {
+      setExpenses((current) => {
+        if (current.some((expense) => expense.id === id)) return current;
+        const restored = [...current];
+        restored.splice(Math.min(previousIndex, restored.length), 0, previousExpense);
+        return restored;
+      });
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, expenses, onSessionExpired]);
 
   const clearExpenses = useCallback(async () => {
     setExpenses([]);

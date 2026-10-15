@@ -2,6 +2,34 @@ import { useState, useEffect, useCallback, useMemo, startTransition } from "reac
 import { calculateStats } from "../lib/utils";
 import { getApiBaseUrl, authFetch } from "../lib/config";
 
+async function requestApi(url, options, fallbackMessage, onSessionExpired) {
+  let response;
+
+  try {
+    response = await authFetch(url, options);
+  } catch {
+    throw new Error("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
+  }
+
+  if (response.status === 401) {
+    onSessionExpired?.();
+    throw new Error("Sua sessão expirou. Entre novamente para continuar.");
+  }
+
+  if (!response.ok) {
+    let message = fallbackMessage;
+    try {
+      const data = await response.json();
+      if (typeof data.error === "string" && data.error.trim()) {
+        message = data.error;
+      }
+    } catch {}
+    throw new Error(message);
+  }
+
+  return response;
+}
+
 export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired) {
   const API_BASE = getApiBaseUrl();
   const [expenses, setExpenses] = useState([]);
@@ -101,22 +129,24 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
     };
 
     try {
-      const res = await authFetch(`${API_BASE}/api/gastos`, {
+      const res = await requestApi(`${API_BASE}/api/gastos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formatted),
+      }, "Não foi possível salvar o gasto.", onSessionExpired);
+      const created = await res.json();
+      setExpenses((prev) => {
+        if (prev.some((g) => g.id === created.id)) return prev;
+        return [created, ...prev];
       });
-      if (res.ok) {
-        const created = await res.json();
-        setExpenses((prev) => {
-          if (prev.some((g) => g.id === created.id)) return prev;
-          return [created, ...prev];
-        });
+      return created;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error("O servidor retornou uma resposta inválida. O gasto não foi confirmado.");
       }
-    } catch (err) {
-      console.error("Error saving expense to backend:", err);
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, onSessionExpired]);
 
   const addExpenseFromSocket = useCallback((expense) => {
     const formatted = {
@@ -134,39 +164,100 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   }, []);
 
   const updateExpense = useCallback(async (updatedExpense) => {
+    const previousIndex = expenses.findIndex((expense) => expense.id === updatedExpense.id);
+    const previousExpense = expenses[previousIndex];
+    if (!previousExpense) {
+      throw new Error("Este gasto não está mais disponível para atualização.");
+    }
+
     setExpenses((prev) =>
       prev.map((g) => (g.id === updatedExpense.id ? updatedExpense : g))
     );
     try {
-      await authFetch(`${API_BASE}/api/gastos/${updatedExpense.id}`, {
+      await requestApi(`${API_BASE}/api/gastos/${updatedExpense.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedExpense),
+      }, "Não foi possível atualizar o gasto.", onSessionExpired);
+    } catch (error) {
+      setExpenses((current) => {
+        const currentIndex = current.findIndex((expense) => expense.id === updatedExpense.id);
+        if (currentIndex < 0) {
+          const restored = [...current];
+          restored.splice(Math.min(previousIndex, restored.length), 0, previousExpense);
+          return restored;
+        }
+        return current.map((expense) =>
+          expense.id === updatedExpense.id ? previousExpense : expense
+        );
       });
-    } catch (err) {
-      console.error("Error updating expense in backend:", err);
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, expenses, onSessionExpired]);
 
   const deleteExpense = useCallback(async (id) => {
+    const previousIndex = expenses.findIndex((expense) => expense.id === id);
+    const previousExpense = expenses[previousIndex];
+    if (!previousExpense) {
+      throw new Error("Este gasto não está mais disponível para exclusão.");
+    }
+
     setExpenses((prev) => prev.filter((g) => g.id !== id));
     try {
-      await authFetch(`${API_BASE}/api/gastos/${id}`, { method: "DELETE" });
-    } catch (err) {
-      console.error("Error deleting expense in backend:", err);
+      await requestApi(
+        `${API_BASE}/api/gastos/${id}`,
+        { method: "DELETE" },
+        "Não foi possível excluir o gasto.",
+        onSessionExpired
+      );
+    } catch (error) {
+      setExpenses((current) => {
+        if (current.some((expense) => expense.id === id)) return current;
+        const restored = [...current];
+        restored.splice(Math.min(previousIndex, restored.length), 0, previousExpense);
+        return restored;
+      });
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, expenses, onSessionExpired]);
 
   const clearExpenses = useCallback(async () => {
-    setExpenses([]);
+    const isExpenseInMonth = (expense) => {
+      const [year, month] = String(expense.data || "").split("T")[0].split("-");
+      return Number(year) === dateFilter.ano && Number(month) === dateFilter.mes + 1;
+    };
+    const removedExpenses = expenses
+      .map((expense, index) => ({ expense, index }))
+      .filter(({ expense }) => isExpenseInMonth(expense));
+
+    setExpenses((current) =>
+      current.filter((expense) => !isExpenseInMonth(expense))
+    );
+
     try {
-      await authFetch(`${API_BASE}/api/gastos?mes=${dateFilter.mes + 1}&ano=${dateFilter.ano}`, {
-        method: "DELETE",
+      await requestApi(
+        `${API_BASE}/api/gastos?mes=${dateFilter.mes + 1}&ano=${dateFilter.ano}`,
+        { method: "DELETE" },
+        "Não foi possível limpar os gastos deste mês.",
+        onSessionExpired
+      );
+    } catch (error) {
+      setExpenses((current) => {
+        const currentIds = new Set(current.map((expense) => expense.id));
+        const missingExpenses = removedExpenses.filter(
+          ({ expense }) => !currentIds.has(expense.id)
+        );
+        const restored = [...current];
+
+        for (const { expense, index } of missingExpenses) {
+          restored.splice(Math.min(index, restored.length), 0, expense);
+        }
+
+        return restored;
       });
-    } catch (err) {
-      console.error("Error clearing expenses in backend:", err);
+      throw error;
     }
-  }, [API_BASE, dateFilter]);
+  }, [API_BASE, dateFilter, expenses, onSessionExpired]);
 
   const setLimit = useCallback(async (category, amount) => {
     const catClean = (category || "geral").toLowerCase().trim();

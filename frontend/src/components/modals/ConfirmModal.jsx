@@ -3,6 +3,7 @@ import { Trash2, AlertTriangle } from "lucide-react";
 export function ConfirmModal({
   isOpen,
   type,
+  error,
   onClose,
   onConfirm
 }) {
@@ -31,6 +32,12 @@ export function ConfirmModal({
               : "Esta ação é permanente e removerá o gasto selecionado."}
           </p>
         </div>
+
+        {error && (
+          <p className="text-left text-xs text-red-400" role="alert">
+            {error}
+          </p>
+        )}
 
         <div className="flex flex-col gap-2 pt-2">
           <button

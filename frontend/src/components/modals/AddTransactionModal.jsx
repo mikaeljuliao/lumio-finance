@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, Plus, Calendar, DollarSign, Tag, FileText } from "lucide-react";
 import { CATEGORIES } from "../../lib/constants";
 import { getLocalDateInputValue, parseCurrencyInput } from "../../lib/utils";
@@ -7,16 +7,21 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [amountError, setAmountError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [category, setCategory] = useState("alimentação");
   const [date, setDate] = useState(getLocalDateInputValue);
 
-  useEffect(() => {
-    if (isOpen) setAmountError("");
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleClose = () => {
+    if (isSaving) return;
+    setAmountError("");
+    setSaveError("");
+    onClose();
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const parsedAmount = parseCurrencyInput(amount);
     if (parsedAmount === null || parsedAmount <= 0) {
@@ -25,28 +30,36 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
     }
     setAmountError("");
 
-    onSave({
-      id: Date.now(),
-      descricao: description.trim(),
-      valor: parsedAmount,
-      categoria: category,
-      data: date,
-      created_at: new Date().toISOString()
-    });
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      await onSave({
+        id: Date.now(),
+        descricao: description.trim(),
+        valor: parsedAmount,
+        categoria: category,
+        data: date,
+        created_at: new Date().toISOString()
+      });
 
-    setDescription("");
-    setAmount("");
-    setAmountError("");
-    setCategory("alimentação");
-    setDate(getLocalDateInputValue());
-    onClose();
+      setDescription("");
+      setAmount("");
+      setAmountError("");
+      setCategory("alimentação");
+      setDate(getLocalDateInputValue());
+      onClose();
+    } catch (error) {
+      setSaveError(error.message || "Não foi possível salvar o gasto. Tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div
         className="fixed inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div className="relative bg-[#0F0F12] border border-zinc-800 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5 my-auto">
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
@@ -64,7 +77,9 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
             </div>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={handleClose}
+            disabled={isSaving}
             className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800/80 rounded-xl transition-colors"
           >
             <X className="w-4 h-4" />
@@ -153,19 +168,27 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
             </div>
           </div>
 
+          {saveError && (
+            <p className="text-xs text-red-400" role="alert">
+              {saveError}
+            </p>
+          )}
+
           <div className="pt-2 flex items-center justify-end gap-2.5">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
+              disabled={isSaving}
               className="px-4 py-2.5 bg-zinc-900 text-zinc-400 hover:text-white rounded-xl text-xs font-bold transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              disabled={isSaving}
               className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/15"
             >
-              Salvar Gasto
+              {isSaving ? "Salvando..." : "Salvar Gasto"}
             </button>
           </div>
         </form>

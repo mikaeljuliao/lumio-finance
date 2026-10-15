@@ -2,6 +2,34 @@ import { useState, useEffect, useCallback, useMemo, startTransition } from "reac
 import { calculateStats } from "../lib/utils";
 import { getApiBaseUrl, authFetch } from "../lib/config";
 
+async function requestApi(url, options, fallbackMessage, onSessionExpired) {
+  let response;
+
+  try {
+    response = await authFetch(url, options);
+  } catch {
+    throw new Error("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
+  }
+
+  if (response.status === 401) {
+    onSessionExpired?.();
+    throw new Error("Sua sessão expirou. Entre novamente para continuar.");
+  }
+
+  if (!response.ok) {
+    let message = fallbackMessage;
+    try {
+      const data = await response.json();
+      if (typeof data.error === "string" && data.error.trim()) {
+        message = data.error;
+      }
+    } catch {}
+    throw new Error(message);
+  }
+
+  return response;
+}
+
 export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired) {
   const API_BASE = getApiBaseUrl();
   const [expenses, setExpenses] = useState([]);
@@ -101,22 +129,24 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
     };
 
     try {
-      const res = await authFetch(`${API_BASE}/api/gastos`, {
+      const res = await requestApi(`${API_BASE}/api/gastos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formatted),
+      }, "Não foi possível salvar o gasto.", onSessionExpired);
+      const created = await res.json();
+      setExpenses((prev) => {
+        if (prev.some((g) => g.id === created.id)) return prev;
+        return [created, ...prev];
       });
-      if (res.ok) {
-        const created = await res.json();
-        setExpenses((prev) => {
-          if (prev.some((g) => g.id === created.id)) return prev;
-          return [created, ...prev];
-        });
+      return created;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error("O servidor retornou uma resposta inválida. O gasto não foi confirmado.");
       }
-    } catch (err) {
-      console.error("Error saving expense to backend:", err);
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, onSessionExpired]);
 
   const addExpenseFromSocket = useCallback((expense) => {
     const formatted = {

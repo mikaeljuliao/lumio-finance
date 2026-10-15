@@ -134,7 +134,7 @@ export default function Home() {
   };
 
   const handleSaveAdd = (newExpense) => {
-    addExpense(newExpense);
+    return addExpense(newExpense);
   };
 
   const handleSaveEdit = (updatedExpense) => {

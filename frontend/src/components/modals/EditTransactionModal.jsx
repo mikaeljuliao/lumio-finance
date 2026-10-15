@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, Edit3, Calendar, DollarSign, Tag, FileText } from "lucide-react";
 import { CATEGORIES } from "../../lib/constants";
 
-export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
+export function EditTransactionModal({ isOpen, gasto, error, onClose, onSave }) {
   const [formData, setFormData] = useState(gasto);
 
   if (!isOpen || !formData) return null;
@@ -121,6 +121,12 @@ export function EditTransactionModal({ isOpen, gasto, onClose, onSave }) {
               ))}
             </div>
           </div>
+
+          {error && (
+            <p className="text-xs text-red-400" role="alert">
+              {error}
+            </p>
+          )}
 
           <div className="pt-2 flex items-center justify-end gap-3">
             <button

@@ -26,6 +26,7 @@ export default function Home() {
   const API_BASE = getApiBaseUrl();
   const [user, setUser] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [mutationError, setMutationError] = useState("");
 
   const [dateFilter, setDateFilter] = useState({
     mes: new Date().getMonth(),
@@ -137,18 +138,28 @@ export default function Home() {
     return addExpense(newExpense);
   };
 
-  const handleSaveEdit = (updatedExpense) => {
-    updateExpense(updatedExpense);
-    setEditingExpense(null);
+  const handleSaveEdit = async (updatedExpense) => {
+    setMutationError("");
+    try {
+      await updateExpense(updatedExpense);
+      setEditingExpense(null);
+    } catch (error) {
+      setMutationError(error.message || "Não foi possível atualizar o gasto. Tente novamente.");
+    }
   };
 
-  const handleConfirmAction = () => {
-    if (confirmModalState.type === "delete" && confirmModalState.expenseId) {
-      deleteExpense(confirmModalState.expenseId);
-    } else if (confirmModalState.type === "clear") {
-      clearExpenses();
+  const handleConfirmAction = async () => {
+    setMutationError("");
+    try {
+      if (confirmModalState.type === "delete" && confirmModalState.expenseId) {
+        await deleteExpense(confirmModalState.expenseId);
+      } else if (confirmModalState.type === "clear") {
+        await clearExpenses();
+      }
+      setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined });
+    } catch (error) {
+      setMutationError(error.message || "Não foi possível concluir a ação. Tente novamente.");
     }
-    setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined });
   };
 
   if (isAuthChecking) {
@@ -208,20 +219,22 @@ export default function Home() {
               monthName={MONTH_NAMES[dateFilter.mes]}
               isLoading={isLoading}
               onEdit={(expense) => setEditingExpense(expense)}
-              onDelete={(expenseId) =>
+              onDelete={(expenseId) => {
+                setMutationError("");
                 setConfirmModalState({
                   isOpen: true,
                   type: "delete",
                   expenseId
-                })
-              }
-              onClearAll={() =>
+                });
+              }}
+              onClearAll={() => {
+                setMutationError("");
                 setConfirmModalState({
                   isOpen: true,
                   type: "clear",
                   expenseId: undefined
-                })
-              }
+                });
+              }}
               onOpenAddModal={() => setIsAddModalOpen(true)}
             />
           </div>
@@ -238,7 +251,11 @@ export default function Home() {
         key={editingExpense?.id ?? "closed"}
         isOpen={Boolean(editingExpense)}
         gasto={editingExpense}
-        onClose={() => setEditingExpense(null)}
+        error={mutationError}
+        onClose={() => {
+          setMutationError("");
+          setEditingExpense(null);
+        }}
         onSave={handleSaveEdit}
       />
 
@@ -257,9 +274,11 @@ export default function Home() {
       <ConfirmModal
         isOpen={confirmModalState.isOpen}
         type={confirmModalState.type}
-        onClose={() =>
-          setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined })
-        }
+        error={mutationError}
+        onClose={() => {
+          setMutationError("");
+          setConfirmModalState({ isOpen: false, type: "delete", expenseId: undefined });
+        }}
         onConfirm={handleConfirmAction}
       />
 

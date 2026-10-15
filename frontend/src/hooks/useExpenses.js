@@ -164,19 +164,36 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   }, []);
 
   const updateExpense = useCallback(async (updatedExpense) => {
+    const previousIndex = expenses.findIndex((expense) => expense.id === updatedExpense.id);
+    const previousExpense = expenses[previousIndex];
+    if (!previousExpense) {
+      throw new Error("Este gasto não está mais disponível para atualização.");
+    }
+
     setExpenses((prev) =>
       prev.map((g) => (g.id === updatedExpense.id ? updatedExpense : g))
     );
     try {
-      await authFetch(`${API_BASE}/api/gastos/${updatedExpense.id}`, {
+      await requestApi(`${API_BASE}/api/gastos/${updatedExpense.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedExpense),
+      }, "Não foi possível atualizar o gasto.", onSessionExpired);
+    } catch (error) {
+      setExpenses((current) => {
+        const currentIndex = current.findIndex((expense) => expense.id === updatedExpense.id);
+        if (currentIndex < 0) {
+          const restored = [...current];
+          restored.splice(Math.min(previousIndex, restored.length), 0, previousExpense);
+          return restored;
+        }
+        return current.map((expense) =>
+          expense.id === updatedExpense.id ? previousExpense : expense
+        );
       });
-    } catch (err) {
-      console.error("Error updating expense in backend:", err);
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, expenses, onSessionExpired]);
 
   const deleteExpense = useCallback(async (id) => {
     setExpenses((prev) => prev.filter((g) => g.id !== id));

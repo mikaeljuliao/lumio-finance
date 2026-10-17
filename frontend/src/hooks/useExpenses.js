@@ -278,33 +278,64 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   const setLimit = useCallback(async (category, amount) => {
     const catClean = (category || "geral").toLowerCase().trim();
     const valNumber = Number(amount) || 0;
+    const hadPreviousValue = Object.prototype.hasOwnProperty.call(limits, catClean);
+    const previousValue = limits[catClean];
+
+    setLimits((prev) => ({ ...prev, [catClean]: valNumber }));
     try {
-      setLimits((prev) => ({ ...prev, [catClean]: valNumber }));
-      await authFetch(`${API_BASE}/api/limites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria: catClean, valor: valNumber }),
+      await requestApi(
+        `${API_BASE}/api/limites`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoria: catClean, valor: valNumber })
+        },
+        "Não foi possível salvar o limite.",
+        onSessionExpired
+      );
+    } catch (error) {
+      setLimits((current) => {
+        if (current[catClean] !== valNumber) return current;
+        const restored = { ...current };
+        if (hadPreviousValue) {
+          restored[catClean] = previousValue;
+        } else {
+          delete restored[catClean];
+        }
+        return restored;
       });
-    } catch (err) {
-      console.error("Error setting limit in backend:", err);
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, limits, onSessionExpired]);
 
   const removeLimit = useCallback(async (category) => {
     const catClean = (category || "geral").toLowerCase().trim();
+    const hadPreviousValue = Object.prototype.hasOwnProperty.call(limits, catClean);
+    const previousValue = limits[catClean];
+
+    setLimits((prev) => {
+      const updated = { ...prev };
+      delete updated[catClean];
+      return updated;
+    });
     try {
-      setLimits((prev) => {
-        const updated = { ...prev };
-        delete updated[catClean];
-        return updated;
-      });
-      await authFetch(`${API_BASE}/api/limites/${encodeURIComponent(catClean)}`, {
-        method: "DELETE",
-      });
-    } catch (err) {
-      console.error("Error removing limit in backend:", err);
+      await requestApi(
+        `${API_BASE}/api/limites/${encodeURIComponent(catClean)}`,
+        { method: "DELETE" },
+        "Não foi possível remover o limite.",
+        onSessionExpired
+      );
+    } catch (error) {
+      if (hadPreviousValue) {
+        setLimits((current) =>
+          Object.prototype.hasOwnProperty.call(current, catClean)
+            ? current
+            : { ...current, [catClean]: previousValue }
+        );
+      }
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, limits, onSessionExpired]);
 
   const parseExpenseYearMonth = (dateStr) => {
     if (!dateStr) return { ano: null, mes: null };

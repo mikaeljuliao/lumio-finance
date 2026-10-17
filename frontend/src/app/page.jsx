@@ -126,13 +126,13 @@ export default function Home() {
     });
   };
 
-  const handleSaveLimit = (categoria, valor) => {
-    setLimit(categoria, valor);
+  const handleSaveLimit = async (categoria, valor) => {
+    await setLimit(categoria, valor);
     setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
   };
 
-  const handleRemoveLimit = (categoria) => {
-    removeLimit(categoria);
+  const handleRemoveLimit = async (categoria) => {
+    await removeLimit(categoria);
     setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
   };
 

@@ -12,10 +12,16 @@ export function LimitModal({
 }) {
   const [amount, setAmount] = useState(valorInicial);
   const [amountError, setAmountError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleClose = () => {
+    if (!isSaving) onClose();
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const numericValue = parseCurrencyInput(amount);
     if (numericValue === null || numericValue <= 0) {
@@ -23,7 +29,27 @@ export function LimitModal({
       return;
     }
     setAmountError("");
-    onSave(categoria, numericValue);
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      await onSave(categoria, numericValue);
+    } catch (error) {
+      setSaveError(error.message || "Não foi possível salvar o limite. Tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      await onRemove(categoria);
+    } catch (error) {
+      setSaveError(error.message || "Não foi possível remover o limite. Tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const isGeneral = categoria === "geral";
@@ -32,7 +58,7 @@ export function LimitModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div className="relative bg-[#0F0F12] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
@@ -50,7 +76,9 @@ export function LimitModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={handleClose}
+            disabled={isSaving}
             className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800/80 rounded-xl transition-colors"
           >
             <X className="w-5 h-5" />
@@ -84,11 +112,18 @@ export function LimitModal({
             )}
           </div>
 
+          {saveError && (
+            <p className="text-xs text-red-400" role="alert">
+              {saveError}
+            </p>
+          )}
+
           <div className="flex gap-3 pt-2">
             {!isGeneral && (
               <button
                 type="button"
-                onClick={() => onRemove(categoria)}
+                onClick={handleRemove}
+                disabled={isSaving}
                 className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 rounded-xl transition-colors"
                 title="Remover limite da categoria"
               >
@@ -97,9 +132,10 @@ export function LimitModal({
             )}
             <button
               type="submit"
+              disabled={isSaving}
               className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-3 rounded-xl transition-all text-xs uppercase tracking-wider"
             >
-              {isGeneral ? "Salvar Orçamento" : "Salvar Limite"}
+              {isSaving ? "Salvando..." : isGeneral ? "Salvar Orçamento" : "Salvar Limite"}
             </button>
           </div>
         </form>

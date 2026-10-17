@@ -61,7 +61,7 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
       .filter(Boolean)
   );
   const average = spendingDays.size > 0 ? total / spendingDays.size : 0;
-  const diff = previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : 0;
+  const diff = previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : null;
 
   const byCategory = filteredExpenses.reduce((acc, g) => {
     const cat = g.categoria || "outros";

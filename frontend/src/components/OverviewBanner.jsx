@@ -9,6 +9,7 @@ export function OverviewBanner({
   const monthlyBudget = Number(limits.geral) || 0;
   const hasBudget = monthlyBudget > 0;
   const totalSpent = stats.total || 0;
+  const hasPreviousMonth = stats.totalAnterior > 0;
   const remainingBudget = hasBudget ? monthlyBudget - totalSpent : 0;
   const usedPercentage = hasBudget
     ? Math.min((totalSpent / monthlyBudget) * 100, 100)
@@ -73,19 +74,27 @@ export function OverviewBanner({
             {formatCurrency(totalSpent)}
           </div>
           <div className="flex items-center gap-1 text-[10px] sm:text-xs font-bold">
-            <span
-              className={`inline-flex items-center ${
-                stats.diff > 0 ? "text-red-400" : "text-emerald-400"
-              }`}
-            >
-              {stats.diff > 0 ? (
-                <ArrowUpRight className="w-3 h-3" />
-              ) : (
-                <ArrowDownRight className="w-3 h-3" />
-              )}
-              {Math.abs(stats.diff).toFixed(1)}%
-            </span>
-            <span className="text-zinc-500 font-normal">vs mês anterior</span>
+            {hasPreviousMonth ? (
+              <>
+                <span
+                  className={`inline-flex items-center ${
+                    stats.diff > 0 ? "text-red-400" : "text-emerald-400"
+                  }`}
+                >
+                  {stats.diff > 0 ? (
+                    <ArrowUpRight className="w-3 h-3" />
+                  ) : (
+                    <ArrowDownRight className="w-3 h-3" />
+                  )}
+                  {Math.abs(stats.diff).toFixed(1)}%
+                </span>
+                <span className="text-zinc-500 font-normal">vs mês anterior</span>
+              </>
+            ) : (
+              <span className="text-zinc-500 font-normal">
+                Sem gastos no mês anterior
+              </span>
+            )}
           </div>
         </div>
 

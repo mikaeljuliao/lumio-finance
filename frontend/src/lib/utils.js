@@ -74,15 +74,20 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
     .sort((a, b) => b.value - a.value);
 
   const byDate = filteredExpenses.reduce((acc, g) => {
-    const dateOnly = String(g.data).split("T")[0];
+    const dateOnly = String(g.data || "").split("T")[0];
+    if (!dateOnly) return acc;
     const [, month, day] = dateOnly.split("-");
     const label = day ? `${day}/${month}` : new Date(g.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    acc[label] = (acc[label] || 0) + Number(g.valor);
+    acc[dateOnly] = {
+      name: label,
+      total: (acc[dateOnly]?.total || 0) + Number(g.valor)
+    };
     return acc;
   }, {});
 
   const timelineData = Object.entries(byDate)
-    .map(([name, total]) => ({ name, total }));
+    .sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate))
+    .map(([, dailyTotal]) => dailyTotal);
 
   return {
     total,

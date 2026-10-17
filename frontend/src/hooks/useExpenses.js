@@ -49,9 +49,25 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
       return { sessionExpired: true };
     }
 
+    const failedRequest = [
+      { response: resExpenses, message: "Não foi possível carregar os gastos." },
+      { response: resLimits, message: "Não foi possível carregar os limites." }
+    ].find(({ response }) => !response.ok);
+
+    if (failedRequest) {
+      let message = failedRequest.message;
+      try {
+        const data = await failedRequest.response.json();
+        if (typeof data.error === "string" && data.error.trim()) {
+          message = data.error;
+        }
+      } catch {}
+      throw new Error(message);
+    }
+
     const [dataExpenses, dataLimits] = await Promise.all([
-      resExpenses.ok ? resExpenses.json() : null,
-      resLimits.ok ? resLimits.json() : null,
+      resExpenses.json(),
+      resLimits.json(),
     ]);
 
     return {
@@ -86,7 +102,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
 
   const handleFetchError = useCallback((err) => {
     console.error("Error fetching data from backend:", err);
-    setError("Unable to load data.");
+    setError(err.message || "Não foi possível carregar os dados. Tente novamente.");
   }, []);
 
   useEffect(() => {

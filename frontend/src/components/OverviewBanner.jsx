@@ -4,7 +4,6 @@ import { formatCurrency } from "../lib/utils";
 export function OverviewBanner({
   stats,
   limits,
-  totalRecords,
   onOpenLimitModal
 }) {
   const monthlyBudget = Number(limits.geral) || 0;
@@ -145,7 +144,7 @@ export function OverviewBanner({
             {formatCurrency(stats.media)}
           </div>
           <p className="text-[10px] sm:text-xs text-zinc-400">
-            Em {totalRecords} {totalRecords === 1 ? "lançamento" : "lançamentos"}
+            Em {stats.diasComGastos} {stats.diasComGastos === 1 ? "dia com gasto" : "dias com gastos"}
           </p>
         </div>
       </div>

@@ -198,7 +198,6 @@ export default function Home() {
         <OverviewBanner
           stats={stats}
           limits={limits}
-          totalRecords={filteredExpenses.length}
           onOpenLimitModal={handleOpenLimitModal}
         />
 

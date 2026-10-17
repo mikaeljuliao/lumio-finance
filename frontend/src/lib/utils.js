@@ -55,7 +55,12 @@ export function formatRelativeDate(dateString) {
 export function calculateStats(filteredExpenses, previousMonthExpenses) {
   const total = filteredExpenses.reduce((acc, g) => acc + Number(g.valor), 0);
   const previousTotal = previousMonthExpenses.reduce((acc, g) => acc + Number(g.valor), 0);
-  const average = filteredExpenses.length > 0 ? total / filteredExpenses.length : 0;
+  const spendingDays = new Set(
+    filteredExpenses
+      .map((expense) => String(expense.data || "").split("T")[0])
+      .filter(Boolean)
+  );
+  const average = spendingDays.size > 0 ? total / spendingDays.size : 0;
   const diff = previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : 0;
 
   const byCategory = filteredExpenses.reduce((acc, g) => {
@@ -70,7 +75,7 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
 
   const byDate = filteredExpenses.reduce((acc, g) => {
     const dateOnly = String(g.data).split("T")[0];
-    const [year, month, day] = dateOnly.split("-");
+    const [, month, day] = dateOnly.split("-");
     const label = day ? `${day}/${month}` : new Date(g.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
     acc[label] = (acc[label] || 0) + Number(g.valor);
     return acc;
@@ -84,6 +89,7 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
     totalAnterior: previousTotal,
     diff,
     media: average,
+    diasComGastos: spendingDays.size,
     dataCategoria: categoryData,
     dataTimeline: timelineData,
     porCategoria: byCategory,

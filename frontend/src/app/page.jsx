@@ -20,7 +20,7 @@ import { LimitModal } from "../components/modals/LimitModal";
 import { ConfirmModal } from "../components/modals/ConfirmModal";
 import { WhatsAppModal } from "../components/modals/WhatsAppModal";
 import { HowItWorksModal } from "../components/modals/HowItWorksModal";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 
 export default function Home() {
   const API_BASE = getApiBaseUrl();
@@ -68,6 +68,8 @@ export default function Home() {
     limits,
     stats,
     isLoading,
+    error: expensesError,
+    refetch,
     addExpense,
     addExpenseFromSocket,
     updateExpense,
@@ -124,13 +126,13 @@ export default function Home() {
     });
   };
 
-  const handleSaveLimit = (categoria, valor) => {
-    setLimit(categoria, valor);
+  const handleSaveLimit = async (categoria, valor) => {
+    await setLimit(categoria, valor);
     setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
   };
 
-  const handleRemoveLimit = (categoria) => {
-    removeLimit(categoria);
+  const handleRemoveLimit = async (categoria) => {
+    await removeLimit(categoria);
     setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
   };
 
@@ -189,6 +191,27 @@ export default function Home() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {expensesError && (
+          <div
+            className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 sm:flex-row sm:items-center sm:justify-between"
+            role="alert"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <p>{expensesError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={refetch}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 self-start rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-200 transition-colors hover:bg-red-500/10 disabled:cursor-wait disabled:opacity-60 sm:self-auto"
+            >
+              <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
         <QuickActionBar
           onOpenAddModal={() => setIsAddModalOpen(true)}
           onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
@@ -198,7 +221,6 @@ export default function Home() {
         <OverviewBanner
           stats={stats}
           limits={limits}
-          totalRecords={filteredExpenses.length}
           onOpenLimitModal={handleOpenLimitModal}
         />
 

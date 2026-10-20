@@ -49,9 +49,25 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
       return { sessionExpired: true };
     }
 
+    const failedRequest = [
+      { response: resExpenses, message: "Não foi possível carregar os gastos." },
+      { response: resLimits, message: "Não foi possível carregar os limites." }
+    ].find(({ response }) => !response.ok);
+
+    if (failedRequest) {
+      let message = failedRequest.message;
+      try {
+        const data = await failedRequest.response.json();
+        if (typeof data.error === "string" && data.error.trim()) {
+          message = data.error;
+        }
+      } catch {}
+      throw new Error(message);
+    }
+
     const [dataExpenses, dataLimits] = await Promise.all([
-      resExpenses.ok ? resExpenses.json() : null,
-      resLimits.ok ? resLimits.json() : null,
+      resExpenses.json(),
+      resLimits.json(),
     ]);
 
     return {
@@ -86,7 +102,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
 
   const handleFetchError = useCallback((err) => {
     console.error("Error fetching data from backend:", err);
-    setError("Unable to load data.");
+    setError(err.message || "Não foi possível carregar os dados. Tente novamente.");
   }, []);
 
   useEffect(() => {
@@ -262,33 +278,64 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   const setLimit = useCallback(async (category, amount) => {
     const catClean = (category || "geral").toLowerCase().trim();
     const valNumber = Number(amount) || 0;
+    const hadPreviousValue = Object.prototype.hasOwnProperty.call(limits, catClean);
+    const previousValue = limits[catClean];
+
+    setLimits((prev) => ({ ...prev, [catClean]: valNumber }));
     try {
-      setLimits((prev) => ({ ...prev, [catClean]: valNumber }));
-      await authFetch(`${API_BASE}/api/limites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria: catClean, valor: valNumber }),
+      await requestApi(
+        `${API_BASE}/api/limites`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoria: catClean, valor: valNumber })
+        },
+        "Não foi possível salvar o limite.",
+        onSessionExpired
+      );
+    } catch (error) {
+      setLimits((current) => {
+        if (current[catClean] !== valNumber) return current;
+        const restored = { ...current };
+        if (hadPreviousValue) {
+          restored[catClean] = previousValue;
+        } else {
+          delete restored[catClean];
+        }
+        return restored;
       });
-    } catch (err) {
-      console.error("Error setting limit in backend:", err);
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, limits, onSessionExpired]);
 
   const removeLimit = useCallback(async (category) => {
     const catClean = (category || "geral").toLowerCase().trim();
+    const hadPreviousValue = Object.prototype.hasOwnProperty.call(limits, catClean);
+    const previousValue = limits[catClean];
+
+    setLimits((prev) => {
+      const updated = { ...prev };
+      delete updated[catClean];
+      return updated;
+    });
     try {
-      setLimits((prev) => {
-        const updated = { ...prev };
-        delete updated[catClean];
-        return updated;
-      });
-      await authFetch(`${API_BASE}/api/limites/${encodeURIComponent(catClean)}`, {
-        method: "DELETE",
-      });
-    } catch (err) {
-      console.error("Error removing limit in backend:", err);
+      await requestApi(
+        `${API_BASE}/api/limites/${encodeURIComponent(catClean)}`,
+        { method: "DELETE" },
+        "Não foi possível remover o limite.",
+        onSessionExpired
+      );
+    } catch (error) {
+      if (hadPreviousValue) {
+        setLimits((current) =>
+          Object.prototype.hasOwnProperty.call(current, catClean)
+            ? current
+            : { ...current, [catClean]: previousValue }
+        );
+      }
+      throw error;
     }
-  }, [API_BASE]);
+  }, [API_BASE, limits, onSessionExpired]);
 
   const parseExpenseYearMonth = (dateStr) => {
     if (!dateStr) return { ano: null, mes: null };

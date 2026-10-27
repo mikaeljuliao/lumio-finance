@@ -29,7 +29,7 @@ export function AnalyticsSection({ stats }) {
                 Evolução Diária de Gastos
               </h3>
               <p className="text-[11px] text-zinc-400">
-                Acompanhamento dos picos e comportamento de saídas no mês
+                Veja em quais dias seus gastos aumentam ou diminuem no mês.
               </p>
             </div>
           </div>
@@ -72,7 +72,7 @@ export function AnalyticsSection({ stats }) {
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-zinc-500">
-                Sem dados de timeline no período selecionado
+                Registre gastos pelo painel ou WhatsApp para acompanhar sua evolução diária.
               </div>
             )}
           </div>
@@ -88,7 +88,7 @@ export function AnalyticsSection({ stats }) {
                 Maiores Gastos por Categoria
               </h3>
               <p className="text-[11px] text-zinc-400">
-                Proporção dos maiores custos acumulados
+                Compare quais categorias concentram mais gastos no período.
               </p>
             </div>
           </div>
@@ -125,7 +125,7 @@ export function AnalyticsSection({ stats }) {
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-zinc-500">
-                Nenhum gasto registrado para categorização
+                Registre alguns gastos para ver como eles se distribuem por categoria.
               </div>
             )}
           </div>

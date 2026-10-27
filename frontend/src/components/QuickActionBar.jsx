@@ -35,7 +35,7 @@ export function QuickActionBar({
           className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900/70 hover:border-emerald-500/30 text-zinc-200 hover:text-emerald-300 text-xs font-bold transition-all active:scale-95 cursor-pointer text-center"
         >
           <HelpCircle className="w-4 h-4 shrink-0" />
-          <span className="truncate">Aprender a usar</span>
+          <span className="truncate">Como usar o Lumio</span>
         </button>
       </div>
 

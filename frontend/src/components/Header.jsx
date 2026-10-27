@@ -68,7 +68,7 @@ export function Header({
             className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-200 transition-colors hover:border-emerald-500/30 hover:text-emerald-300"
           >
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Como funciona o Lumio
+            Como usar o Lumio
           </button>
 
           {user && (

@@ -18,17 +18,17 @@ export function HowItWorksModal({ isOpen, onClose, onOpenWhatsApp }) {
   const examples = [
     {
       icon: MessageSquare,
-      title: "Registrar gasto",
+      title: "Registrar um gasto",
       text: "gastei 35 no almoço"
     },
     {
       icon: Target,
-      title: "Definir limite",
+      title: "Definir limite por categoria",
       text: "limite de 300 em lazer"
     },
     {
       icon: Mic,
-      title: "Usar no WhatsApp",
+      title: "Registrar por áudio",
       text: "gastei 80 na gasolina"
     }
   ];
@@ -53,11 +53,15 @@ export function HowItWorksModal({ isOpen, onClose, onOpenWhatsApp }) {
 
         <div className="pr-10">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">
-            Como funciona o Lumio
+            Como usar o Lumio
           </p>
           <h3 id="how-it-works-title" className="mt-2 text-2xl font-black text-white tracking-tight">
-            Você controla por web ou WhatsApp.
+            Organize seus gastos pelo painel ou WhatsApp.
           </h3>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm leading-relaxed text-zinc-300">
+          No painel, acompanhe seus gastos e limites. Pelo WhatsApp, registre despesas por texto ou áudio. O orçamento mensal é o total que você pretende gastar no mês; os limites por categoria ajudam a acompanhar áreas como alimentação e transporte.
         </div>
 
         <div className="mt-5 space-y-3">
@@ -74,10 +78,6 @@ export function HowItWorksModal({ isOpen, onClose, onOpenWhatsApp }) {
               </div>
             </div>
           ))}
-        </div>
-
-        <div className="mt-5 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-300">
-          Basta escrever como você fala no dia a dia. O Lumio entende texto, voz e limite do mês.
         </div>
 
         <button

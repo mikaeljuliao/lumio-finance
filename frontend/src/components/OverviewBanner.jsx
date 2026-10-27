@@ -100,7 +100,7 @@ export function OverviewBanner({
 
         <div className="bg-zinc-950/70 border border-zinc-800/80 p-4 sm:p-5 rounded-2xl space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Ainda Pode Gastar</span>
+            <span>{isOverBudget ? "Acima do Orçamento" : "Ainda Pode Gastar"}</span>
             <PiggyBank className={`w-3.5 h-3.5 ${isOverBudget ? "text-red-400" : "text-emerald-400"}`} />
           </span>
           <div
@@ -139,6 +139,9 @@ export function OverviewBanner({
           <div className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight truncate">
             {hasBudget ? formatCurrency(monthlyBudget) : "Não definido"}
           </div>
+          <p className="text-[10px] sm:text-xs text-zinc-400">
+            Total que você planeja gastar neste mês.
+          </p>
           <span className="text-[10px] sm:text-xs text-emerald-400 font-bold block group-hover:underline">
             {hasBudget ? "Ajustar orçamento →" : "Definir orçamento →"}
           </span>

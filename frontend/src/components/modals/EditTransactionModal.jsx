@@ -44,7 +44,6 @@ export function EditTransactionModal({ isOpen, gasto, error, onClose, onSave }) 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Descrição */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-zinc-300 flex items-center gap-2">
               <FileText className="w-3.5 h-3.5 text-emerald-400" /> Descrição
@@ -60,7 +59,6 @@ export function EditTransactionModal({ isOpen, gasto, error, onClose, onSave }) 
             />
           </div>
 
-          {/* Valor e Data Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-zinc-300 flex items-center gap-2">
@@ -98,7 +96,6 @@ export function EditTransactionModal({ isOpen, gasto, error, onClose, onSave }) 
             </div>
           </div>
 
-          {/* Categoria */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-zinc-300 flex items-center gap-2">
               <Tag className="w-3.5 h-3.5 text-emerald-400" /> Categoria

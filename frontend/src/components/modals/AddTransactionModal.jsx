@@ -87,7 +87,6 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Descrição */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-emerald-400" /> Descrição
@@ -103,7 +102,6 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
             />
           </div>
 
-          {/* Valor e Data Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
@@ -144,7 +142,6 @@ export function AddTransactionModal({ isOpen, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Categoria */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
               <Tag className="w-3.5 h-3.5 text-emerald-400" /> Categoria

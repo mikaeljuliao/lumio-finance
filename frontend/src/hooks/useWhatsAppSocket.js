@@ -6,7 +6,6 @@ export function useWhatsAppSocket(onNewExpense) {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const socketRef = useRef(null);
 
-  // Keep a ref to the latest callback to avoid reconnecting when it changes
   const onNewExpenseRef = useRef(onNewExpense);
   useEffect(() => {
     onNewExpenseRef.current = onNewExpense;
@@ -35,7 +34,6 @@ export function useWhatsAppSocket(onNewExpense) {
       setIsSocketConnected(false);
     });
 
-    // Backend emits "novo_gasto" — keeping this event name to not break the backend contract
     socket.on("novo_gasto", (expense) => {
       if (onNewExpenseRef.current) {
         onNewExpenseRef.current(expense);
@@ -46,7 +44,6 @@ export function useWhatsAppSocket(onNewExpense) {
       socket.disconnect();
       socketRef.current = null;
     };
-  // Only run once — stable socket lifecycle
   }, []);
 
   return { isSocketConnected };

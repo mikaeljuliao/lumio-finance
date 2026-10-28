@@ -34,6 +34,10 @@ export function WhatsAppModal({ isOpen, onClose }) {
           </div>
         </div>
 
+        <p className="text-xs leading-relaxed text-zinc-300">
+          Use seu WhatsApp para conversar com este número do Lumio. Você não precisa vincular sua conta pessoal ao painel.
+        </p>
+
         <div className="bg-zinc-950/80 border border-zinc-800 p-4 rounded-2xl space-y-2 flex flex-col items-center justify-center">
           <div className="bg-white p-2.5 rounded-xl shadow-md">
             <QRCodeSVG
@@ -45,7 +49,7 @@ export function WhatsAppModal({ isOpen, onClose }) {
             />
           </div>
           <p className="text-[11px] text-zinc-400 font-medium">
-            Escaneie para iniciar a conversa
+            Escaneie para conversar com o Lumio
           </p>
         </div>
 
@@ -88,7 +92,7 @@ export function WhatsAppModal({ isOpen, onClose }) {
           rel="noopener noreferrer"
           className="w-full inline-flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/15 active:scale-95"
         >
-          <span>Abrir WhatsApp</span>
+          <span>Conversar com o Lumio</span>
           <ExternalLink className="w-4 h-4" />
         </a>
       </div>

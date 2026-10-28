@@ -3,37 +3,159 @@ import { SlidersHorizontal, AlertTriangle, CheckCircle2, AlertOctagon, Plus } fr
 import { CATEGORIES } from "../lib/constants";
 import { formatCurrency } from "../lib/utils";
 
-export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
-  const [filterMode, setFilterMode] = useState("all");
+const WARNING_THRESHOLD_PERCENTAGE = 80;
+const MAX_PROGRESS_PERCENTAGE = 100;
 
-  const categoryList = useMemo(() => {
-    return CATEGORIES.map((cat) => {
-      const spent = stats.porCategoria[cat.id] || 0;
-      const limit = limits[cat.id] || 0;
-      const remaining = limit > 0 ? limit - spent : null;
-      const percentage = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+const FILTER_MODES = {
+  ALL: "all",
+  WITH_LIMITS: "limits",
+  ALERTS: "alerts"
+};
+
+function getProgressBarColor(category) {
+  if (!category.hasSpendingLimit) return "bg-zinc-700";
+  if (category.isLimitExceeded) return "bg-red-500";
+  if (category.isNearLimit) return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+function getCategoryStatusIcon(category) {
+  if (!category.hasSpendingLimit) return null;
+  if (category.isLimitExceeded) {
+    return <AlertOctagon className="w-3.5 h-3.5 text-red-400 shrink-0" />;
+  }
+  if (category.isNearLimit) {
+    return <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
+  }
+  return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
+}
+
+function CategoryHealthCard({ category, onSelectCategory }) {
+  const isBudgetExceeded = category.remainingAmount < 0;
+
+  return (
+    <div
+      onClick={() => onSelectCategory(category.id, category.spendingLimit)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelectCategory(category.id, category.spendingLimit);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Editar limite de ${category.id}`}
+      className="group bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 p-3.5 rounded-2xl cursor-pointer transition-all space-y-2.5 min-w-0"
+    >
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base shrink-0">{category.icon}</span>
+          <span className="text-xs font-bold text-zinc-200 capitalize truncate group-hover:text-white transition-colors">
+            {category.id}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-[11px] font-bold shrink-0">
+          {getCategoryStatusIcon(category)}
+          <span className="text-zinc-400">
+            {category.hasSpendingLimit ? `${category.usagePercentage.toFixed(0)}%` : "Sem teto"}
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-base font-black text-white tracking-tight truncate">
+            {formatCurrency(category.spentAmount)}
+          </span>
+          <span className="text-xs text-zinc-400 font-medium shrink-0">
+            {category.hasSpendingLimit ? `Limite: ${formatCurrency(category.spendingLimit)}` : ""}
+          </span>
+        </div>
+
+        {category.hasSpendingLimit ? (
+          <div className="text-[11px] font-medium text-zinc-400 flex justify-between">
+            <span>
+              {isBudgetExceeded ? "Excedido:" : "Restante:"}
+            </span>
+            <strong className={isBudgetExceeded ? "text-red-400" : "text-emerald-400"}>
+              {formatCurrency(Math.abs(category.remainingAmount))}
+            </strong>
+          </div>
+        ) : (
+          <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 group-hover:underline">
+            <Plus className="w-3 h-3" /> Definir limite
+          </div>
+        )}
+      </div>
+
+      <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
+        <div
+          className={`h-full transition-all duration-500 ${getProgressBarColor(category)}`}
+          style={{ width: `${category.hasSpendingLimit ? category.usagePercentage : 0}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
+  const [filterMode, setFilterMode] = useState(FILTER_MODES.ALL);
+
+  const categoriesWithMetrics = useMemo(() => {
+    return CATEGORIES.map((category) => {
+      const spentAmount = stats.porCategoria[category.id] || 0;
+      const spendingLimit = limits[category.id] || 0;
+      const hasSpendingLimit = spendingLimit > 0;
+      const remainingAmount = hasSpendingLimit ? spendingLimit - spentAmount : null;
+      const usagePercentage = hasSpendingLimit
+        ? Math.min((spentAmount / spendingLimit) * 100, MAX_PROGRESS_PERCENTAGE)
+        : 0;
+      const isNearLimit =
+        hasSpendingLimit &&
+        usagePercentage >= WARNING_THRESHOLD_PERCENTAGE &&
+        usagePercentage < MAX_PROGRESS_PERCENTAGE;
+      const isLimitExceeded = hasSpendingLimit && usagePercentage >= MAX_PROGRESS_PERCENTAGE;
+
       return {
-        ...cat,
-        spent,
-        limit,
-        remaining,
-        percentage,
-        hasLimit: limit > 0,
-        isAlert: limit > 0 && percentage >= 80 && percentage < 100,
-        isOver: limit > 0 && percentage >= 100
+        ...category,
+        spentAmount,
+        spendingLimit,
+        remainingAmount,
+        usagePercentage,
+        hasSpendingLimit,
+        isNearLimit,
+        isLimitExceeded
       };
     });
   }, [stats.porCategoria, limits]);
 
-  const filteredCategories = useMemo(() => {
-    if (filterMode === "limits") {
-      return categoryList.filter((c) => c.hasLimit);
+  const displayedCategories = useMemo(() => {
+    if (filterMode === FILTER_MODES.WITH_LIMITS) {
+      return categoriesWithMetrics.filter((category) => category.hasSpendingLimit);
     }
-    if (filterMode === "alerts") {
-      return categoryList.filter((c) => c.isAlert || c.isOver);
+    if (filterMode === FILTER_MODES.ALERTS) {
+      return categoriesWithMetrics.filter(
+        (category) => category.isNearLimit || category.isLimitExceeded
+      );
     }
-    return categoryList;
-  }, [categoryList, filterMode]);
+    return categoriesWithMetrics;
+  }, [categoriesWithMetrics, filterMode]);
+
+  const categoriesWithLimitCount = useMemo(
+    () => categoriesWithMetrics.filter((category) => category.hasSpendingLimit).length,
+    [categoriesWithMetrics]
+  );
+
+  const categoriesInAlertCount = useMemo(
+    () =>
+      categoriesWithMetrics.filter(
+        (category) => category.isNearLimit || category.isLimitExceeded
+      ).length,
+    [categoriesWithMetrics]
+  );
+
+  const hasAnyCategoryWithLimit = categoriesWithLimitCount > 0;
+  const isAlertFilterActive = filterMode === FILTER_MODES.ALERTS;
 
   return (
     <section className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-5">
@@ -54,148 +176,78 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
 
         <div className="flex items-center gap-1 bg-zinc-950/80 border border-zinc-800/80 p-1 rounded-xl self-start sm:self-auto">
           <button
-            onClick={() => setFilterMode("all")}
-            aria-pressed={filterMode === "all"}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${filterMode === "all"
+            onClick={() => setFilterMode(FILTER_MODES.ALL)}
+            aria-pressed={filterMode === FILTER_MODES.ALL}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+              filterMode === FILTER_MODES.ALL
                 ? "bg-zinc-800 text-white"
                 : "text-zinc-400 hover:text-white"
-              }`}
+            }`}
           >
-            Todas ({categoryList.length})
+            Todas ({categoriesWithMetrics.length})
           </button>
           <button
-            onClick={() => setFilterMode("limits")}
-            aria-pressed={filterMode === "limits"}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${filterMode === "limits"
+            onClick={() => setFilterMode(FILTER_MODES.WITH_LIMITS)}
+            aria-pressed={filterMode === FILTER_MODES.WITH_LIMITS}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+              filterMode === FILTER_MODES.WITH_LIMITS
                 ? "bg-zinc-800 text-emerald-400"
                 : "text-zinc-400 hover:text-white"
-              }`}
+            }`}
           >
-            Com Limite ({categoryList.filter((c) => c.hasLimit).length})
+            Com Limite ({categoriesWithLimitCount})
           </button>
           <button
-            onClick={() => setFilterMode("alerts")}
-            aria-pressed={filterMode === "alerts"}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${filterMode === "alerts"
+            onClick={() => setFilterMode(FILTER_MODES.ALERTS)}
+            aria-pressed={filterMode === FILTER_MODES.ALERTS}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+              filterMode === FILTER_MODES.ALERTS
                 ? "bg-zinc-800 text-amber-400"
                 : "text-zinc-400 hover:text-white"
-              }`}
+            }`}
           >
-            Alertas ({categoryList.filter((c) => c.isAlert || c.isOver).length})
+            Alertas ({categoriesInAlertCount})
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-        {filteredCategories.length === 0 ? (
+        {displayedCategories.length === 0 ? (
           <div className="col-span-full rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 px-4 py-8 text-center" aria-live="polite">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800/80 text-emerald-400">
-              {filterMode === "alerts" && categoryList.some((cat) => cat.hasLimit) ? (
+              {isAlertFilterActive && hasAnyCategoryWithLimit ? (
                 <CheckCircle2 className="h-5 w-5" />
               ) : (
                 <SlidersHorizontal className="h-5 w-5" />
               )}
             </div>
             <p className="mt-3 text-sm font-bold text-zinc-200">
-              {filterMode === "alerts" && categoryList.some((cat) => cat.hasLimit)
+              {isAlertFilterActive && hasAnyCategoryWithLimit
                 ? "Nenhum limite em alerta"
                 : "Nenhum limite por categoria definido"}
             </p>
             <p className="mx-auto mt-1 max-w-xs text-xs text-zinc-400">
-              {filterMode === "alerts" && categoryList.some((cat) => cat.hasLimit)
+              {isAlertFilterActive && hasAnyCategoryWithLimit
                 ? "Todas as categorias estão abaixo de 80% do limite."
                 : "Veja as categorias e escolha onde quer definir um limite mensal."}
             </p>
             <button
               type="button"
-              onClick={() => setFilterMode("all")}
+              onClick={() => setFilterMode(FILTER_MODES.ALL)}
               className="mt-4 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-200 transition-colors hover:border-emerald-500/40 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
             >
               Ver todas as categorias
             </button>
           </div>
-        ) : filteredCategories.map((cat) => {
-          const getBarColor = () => {
-            if (!cat.hasLimit) return "bg-zinc-700";
-            if (cat.isOver) return "bg-red-500";
-            if (cat.isAlert) return "bg-amber-500";
-            return "bg-emerald-500";
-          };
-
-          const getBadgeIcon = () => {
-            if (!cat.hasLimit) return null;
-            if (cat.isOver)
-              return <AlertOctagon className="w-3.5 h-3.5 text-red-400 shrink-0" />;
-            if (cat.isAlert)
-              return <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
-            return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
-          };
-
-          return (
-            <div
-              key={cat.id}
-              onClick={() => onOpenLimitModal(cat.id, cat.limit)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onOpenLimitModal(cat.id, cat.limit);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-label={`Editar limite de ${cat.id}`}
-              className="group bg-zinc-950/70 hover:bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 p-3.5 rounded-2xl cursor-pointer transition-all space-y-2.5 min-w-0"
-            >
-              <div className="flex items-center justify-between gap-2 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-base shrink-0">{cat.icon}</span>
-                  <span className="text-xs font-bold text-zinc-200 capitalize truncate group-hover:text-white transition-colors">
-                    {cat.id}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-[11px] font-bold shrink-0">
-                  {getBadgeIcon()}
-                  <span className="text-zinc-400">
-                    {cat.hasLimit ? `${cat.percentage.toFixed(0)}%` : "Sem teto"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-base font-black text-white tracking-tight truncate">
-                    {formatCurrency(cat.spent)}
-                  </span>
-                  <span className="text-xs text-zinc-400 font-medium shrink-0">
-                    {cat.hasLimit ? `Limite: ${formatCurrency(cat.limit)}` : ""}
-                  </span>
-                </div>
-
-                {cat.hasLimit ? (
-                  <div className="text-[11px] font-medium text-zinc-400 flex justify-between">
-                    <span>
-                      {cat.remaining < 0 ? "Excedido:" : "Restante:"}
-                    </span>
-                    <strong className={cat.remaining < 0 ? "text-red-400" : "text-emerald-400"}>
-                      {formatCurrency(Math.abs(cat.remaining))}
-                    </strong>
-                  </div>
-                ) : (
-                  <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 group-hover:underline">
-                    <Plus className="w-3 h-3" /> Definir limite
-                  </div>
-                )}
-              </div>
-
-              <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ${getBarColor()}`}
-                  style={{ width: `${cat.hasLimit ? cat.percentage : 0}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
+        ) : (
+          displayedCategories.map((category) => (
+            <CategoryHealthCard
+              key={category.id}
+              category={category}
+              onSelectCategory={onOpenLimitModal}
+            />
+          ))
+        )}
       </div>
     </section>
   );

@@ -102,8 +102,9 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
   const [filterMode, setFilterMode] = useState(FILTER_MODES.ALL);
 
   const categoriesWithMetrics = useMemo(() => {
+    const categoryTotals = stats.byCategory || stats.porCategoria || {};
     return CATEGORIES.map((category) => {
-      const spentAmount = stats.porCategoria[category.id] || 0;
+      const spentAmount = categoryTotals[category.id] || 0;
       const spendingLimit = limits[category.id] || 0;
       const hasSpendingLimit = spendingLimit > 0;
       const remainingAmount = hasSpendingLimit ? spendingLimit - spentAmount : null;
@@ -127,7 +128,7 @@ export function CategoryHealth({ stats, limits, onOpenLimitModal }) {
         isLimitExceeded
       };
     });
-  }, [stats.porCategoria, limits]);
+  }, [stats.byCategory, stats.porCategoria, limits]);
 
   const displayedCategories = useMemo(() => {
     if (filterMode === FILTER_MODES.WITH_LIMITS) {

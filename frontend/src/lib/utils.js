@@ -91,8 +91,15 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
 
   return {
     total,
-    totalAnterior: previousTotal,
+    previousTotal,
     diff,
+    average,
+    spendingDaysCount: spendingDays.size,
+    categoryData,
+    timelineData,
+    byCategory,
+    // Aliases para compatibilidade retroativa
+    totalAnterior: previousTotal,
     media: average,
     diasComGastos: spendingDays.size,
     dataCategoria: categoryData,

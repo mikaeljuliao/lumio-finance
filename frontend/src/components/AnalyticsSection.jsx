@@ -13,8 +13,10 @@ import {
 import { CHART_COLORS } from "../lib/constants";
 
 export function AnalyticsSection({ stats }) {
-  const hasTimelineData = stats.dataTimeline && stats.dataTimeline.length > 0;
-  const hasCategoryData = stats.dataCategoria && stats.dataCategoria.length > 0;
+  const timelineData = stats.timelineData || stats.dataTimeline || [];
+  const categoryData = stats.categoryData || stats.dataCategoria || [];
+  const hasTimelineData = timelineData.length > 0;
+  const hasCategoryData = categoryData.length > 0;
 
   return (
     <section className="space-y-6">
@@ -37,7 +39,7 @@ export function AnalyticsSection({ stats }) {
           <div className="h-[110px] sm:h-[130px] md:h-[140px] w-full min-w-0 pt-1">
             {hasTimelineData ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.dataTimeline} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                <AreaChart data={timelineData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
@@ -98,14 +100,14 @@ export function AnalyticsSection({ stats }) {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={stats.dataCategoria}
+                    data={categoryData}
                     innerRadius={26}
                     outerRadius={38}
                     paddingAngle={4}
                     dataKey="value"
                     stroke="none"
                   >
-                    {stats.dataCategoria.map((_, i) => (
+                    {categoryData.map((_, i) => (
                       <Cell
                         key={i}
                         fill={CHART_COLORS[i % CHART_COLORS.length]}
@@ -132,7 +134,7 @@ export function AnalyticsSection({ stats }) {
 
           {hasCategoryData && (
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-1.5 pt-2 border-t border-zinc-800/60">
-              {stats.dataCategoria.slice(0, 4).map((cat, i) => (
+              {categoryData.slice(0, 4).map((cat, i) => (
                 <div key={i} className="flex items-center gap-1.5 min-w-0">
                   <div
                     className="w-2 h-2 rounded-full shrink-0"

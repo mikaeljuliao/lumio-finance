@@ -95,8 +95,8 @@ export default function Home() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [limitModalState, setLimitModalState] = useState({
     isOpen: false,
-    categoria: "geral",
-    valor: ""
+    category: "geral",
+    amount: ""
   });
   const [confirmModalState, setConfirmModalState] = useState({
     isOpen: false,
@@ -118,22 +118,22 @@ export default function Home() {
     }));
   };
 
-  const handleOpenLimitModal = (categoria, currentValue) => {
+  const handleOpenLimitModal = (category, currentValue) => {
     setLimitModalState({
       isOpen: true,
-      categoria,
-      valor: currentValue > 0 ? String(currentValue) : ""
+      category,
+      amount: currentValue > 0 ? String(currentValue) : ""
     });
   };
 
-  const handleSaveLimit = async (categoria, valor) => {
-    await setLimit(categoria, valor);
-    setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
+  const handleSaveLimit = async (category, amount) => {
+    await setLimit(category, amount);
+    setLimitModalState({ isOpen: false, category: "geral", amount: "" });
   };
 
-  const handleRemoveLimit = async (categoria) => {
-    await removeLimit(categoria);
-    setLimitModalState({ isOpen: false, categoria: "geral", valor: "" });
+  const handleRemoveLimit = async (category) => {
+    await removeLimit(category);
+    setLimitModalState({ isOpen: false, category: "geral", amount: "" });
   };
 
   const handleSaveAdd = (newExpense) => {
@@ -182,7 +182,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#09090B] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20 antialiased overflow-x-hidden">
       <Header
-        filterDate={dateFilter}
+        dateFilter={dateFilter}
         user={user}
         onPrevMonth={handlePrevMonth}
         onNextMonth={handleNextMonth}
@@ -272,7 +272,7 @@ export default function Home() {
       <EditTransactionModal
         key={editingExpense?.id ?? "closed"}
         isOpen={Boolean(editingExpense)}
-        gasto={editingExpense}
+        expense={editingExpense}
         error={mutationError}
         onClose={() => {
           setMutationError("");
@@ -282,12 +282,12 @@ export default function Home() {
       />
 
       <LimitModal
-        key={`${limitModalState.isOpen}-${limitModalState.categoria}`}
+        key={`${limitModalState.isOpen}-${limitModalState.category}`}
         isOpen={limitModalState.isOpen}
-        categoria={limitModalState.categoria}
-        valorInicial={limitModalState.valor}
+        category={limitModalState.category}
+        initialValue={limitModalState.amount}
         onClose={() =>
-          setLimitModalState({ isOpen: false, categoria: "geral", valor: "" })
+          setLimitModalState({ isOpen: false, category: "geral", amount: "" })
         }
         onSave={handleSaveLimit}
         onRemove={handleRemoveLimit}

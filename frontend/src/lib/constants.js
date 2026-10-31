@@ -46,6 +46,6 @@ export const MONTH_NAMES = [
 
 export const LUMIO_WHATSAPP = {
   raw: "5585987237662",
-  formatted: "+55 (85) 9887237662",
+  formatted: "+55 (85) 98723-7662",
   link: "https://wa.me/5585987237662"
 };

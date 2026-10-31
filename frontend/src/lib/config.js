@@ -8,7 +8,7 @@ export function getApiBaseUrl() {
   ) {
     return "http://localhost:3001";
   }
-  return "https://powerful-essence-production-0894.up.railway.app";
+  return "https://lumio-finance.onrender.com";
 }
 
 const SESSION_KEY = "lumio_session_token";

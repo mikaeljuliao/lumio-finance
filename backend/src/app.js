@@ -11,7 +11,7 @@ const app = express();
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://powerful-essence-production-0894.up.railway.app',
+  'https://lumio-finance.onrender.com',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 

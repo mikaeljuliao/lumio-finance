@@ -9,7 +9,7 @@ export function OverviewBanner({
   const monthlyBudget = Number(limits.geral) || 0;
   const hasBudget = monthlyBudget > 0;
   const totalSpent = stats.total || 0;
-  const hasPreviousMonth = stats.totalAnterior > 0;
+  const hasPreviousMonth = (stats.previousTotal ?? stats.totalAnterior) > 0;
   const remainingBudget = hasBudget ? monthlyBudget - totalSpent : 0;
   const usedPercentage = hasBudget
     ? Math.min((totalSpent / monthlyBudget) * 100, 100)
@@ -153,10 +153,10 @@ export function OverviewBanner({
             <CalendarDays className="w-3.5 h-3.5 text-zinc-400" />
           </span>
           <div className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight truncate">
-            {formatCurrency(stats.media)}
+            {formatCurrency(stats.average ?? stats.media)}
           </div>
           <p className="text-[10px] sm:text-xs text-zinc-400">
-            Em {stats.diasComGastos} {stats.diasComGastos === 1 ? "dia com gasto" : "dias com gastos"}
+            Em {stats.spendingDaysCount ?? stats.diasComGastos} {(stats.spendingDaysCount ?? stats.diasComGastos) === 1 ? "dia com gasto" : "dias com gastos"}
           </p>
         </div>
       </div>

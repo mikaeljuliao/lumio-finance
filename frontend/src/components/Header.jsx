@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, LogOut, Smartphone } from "lucide-react";
 import { MONTH_NAMES } from "../lib/constants";
 
 export function Header({
+  dateFilter,
   filterDate,
   user,
   onPrevMonth,
@@ -10,6 +11,7 @@ export function Header({
   onLogout,
   onOpenHowItWorks
 }) {
+  const currentFilter = dateFilter || filterDate || {};
   const formatUserPhone = (id) => {
     if (!id) return "";
     const clean = String(id).replace(/\D/g, "");
@@ -47,10 +49,10 @@ export function Header({
           </button>
           <div className="px-4 py-1 text-center min-w-[130px]">
             <span className="text-xs font-black uppercase tracking-widest text-emerald-400 block">
-              {MONTH_NAMES[filterDate.mes]}
+              {MONTH_NAMES[currentFilter.mes]}
             </span>
             <span className="text-[10px] text-zinc-400 font-semibold block leading-none">
-              {filterDate.ano}
+              {currentFilter.ano}
             </span>
           </div>
           <button

@@ -4,13 +4,16 @@ import { parseCurrencyInput } from "../../lib/utils";
 
 export function LimitModal({
   isOpen,
+  category,
   categoria,
+  initialValue,
   valorInicial,
   onClose,
   onSave,
   onRemove
 }) {
-  const [amount, setAmount] = useState(valorInicial);
+  const activeCategory = category || categoria || "geral";
+  const [amount, setAmount] = useState(initialValue ?? valorInicial ?? "");
   const [amountError, setAmountError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -32,7 +35,7 @@ export function LimitModal({
     setSaveError("");
     setIsSaving(true);
     try {
-      await onSave(categoria, numericValue);
+      await onSave(activeCategory, numericValue);
     } catch (error) {
       setSaveError(error.message || "Não foi possível salvar o limite. Tente novamente.");
     } finally {
@@ -44,7 +47,7 @@ export function LimitModal({
     setSaveError("");
     setIsSaving(true);
     try {
-      await onRemove(categoria);
+      await onRemove(activeCategory);
     } catch (error) {
       setSaveError(error.message || "Não foi possível remover o limite. Tente novamente.");
     } finally {
@@ -52,7 +55,7 @@ export function LimitModal({
     }
   };
 
-  const isGeneral = categoria === "geral";
+  const isGeneral = activeCategory === "geral";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -71,7 +74,7 @@ export function LimitModal({
                 {isGeneral ? "Definir Orçamento Mensal" : "Definir Limite"}
               </h3>
               <span className="text-xs font-bold text-emerald-400 capitalize">
-                {isGeneral ? "Orçamento Mensal" : categoria}
+                {isGeneral ? "Orçamento Mensal" : activeCategory}
               </span>
             </div>
           </div>

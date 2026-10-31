@@ -30,6 +30,24 @@ app.use(
 
 app.use(express.json());
 
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'online',
+    service: 'Lumio API',
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/auth',
+      gastos: '/api/gastos',
+      limites: '/api/limites',
+      health: '/health',
+    },
+  });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/gastos', expenseRoutes);
 app.use('/api/limites', limitRoutes);

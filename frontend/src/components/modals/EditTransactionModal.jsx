@@ -2,8 +2,8 @@ import { useState } from "react";
 import { X, Edit3, Calendar, DollarSign, Tag, FileText } from "lucide-react";
 import { CATEGORIES } from "../../lib/constants";
 
-export function EditTransactionModal({ isOpen, gasto, error, onClose, onSave }) {
-  const [formData, setFormData] = useState(gasto);
+export function EditTransactionModal({ isOpen, expense, gasto, error, onClose, onSave }) {
+  const [formData, setFormData] = useState(expense || gasto);
 
   if (!isOpen || !formData) return null;
 

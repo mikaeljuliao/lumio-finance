@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, startTransition } from "react";
-import { calculateStats } from "../lib/utils";
+import { calculateStats, extractDateOnly, getLocalDateInputValue } from "../lib/utils";
 import { getApiBaseUrl, authFetch } from "../lib/config";
 
 async function requestApi(url, options, fallbackMessage, onSessionExpired) {
@@ -36,6 +36,23 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
   const [limits, setLimits] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const parseExpenseYearMonth = useCallback((dateStr) => {
+    if (!dateStr) return { ano: null, mes: null };
+    const dateOnly = extractDateOnly(dateStr);
+    const parts = dateOnly.split("-");
+    if (parts.length === 3) {
+      return {
+        ano: parseInt(parts[0], 10),
+        mes: parseInt(parts[1], 10) - 1,
+      };
+    }
+    const d = new Date(dateStr);
+    return {
+      ano: d.getFullYear(),
+      mes: d.getMonth(),
+    };
+  }, []);
 
   const fetchExpensesAndLimits = useCallback(async () => {
     if (!isAuthenticated) return null;
@@ -77,7 +94,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
             valor: Number(g.valor),
             categoria: g.categoria || "outros",
             descricao: g.descricao || "Sem descrição",
-            data: g.data ? String(g.data).split("T")[0] : new Date().toISOString().split("T")[0],
+            data: extractDateOnly(g.data) || getLocalDateInputValue(),
             created_at: g.criadoEm || g.created_at || new Date().toISOString(),
           }))
         : null,
@@ -141,7 +158,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
       valor: Number(newExpense.valor),
       categoria: newExpense.categoria || "outros",
       descricao: newExpense.descricao || "Sem descrição",
-      data: newExpense.data ? String(newExpense.data).split("T")[0] : new Date().toISOString().split("T")[0],
+      data: extractDateOnly(newExpense.data) || getLocalDateInputValue(),
     };
 
     try {
@@ -170,7 +187,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
       valor: Number(expense.valor),
       categoria: expense.categoria || "outros",
       descricao: expense.descricao || "Sem descrição",
-      data: expense.data ? String(expense.data).split("T")[0] : new Date().toISOString().split("T")[0],
+      data: extractDateOnly(expense.data) || getLocalDateInputValue(),
       created_at: expense.created_at || new Date().toISOString(),
     };
     setExpenses((prev) => {
@@ -239,8 +256,8 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
 
   const clearExpenses = useCallback(async () => {
     const isExpenseInMonth = (expense) => {
-      const [year, month] = String(expense.data || "").split("T")[0].split("-");
-      return Number(year) === dateFilter.ano && Number(month) === dateFilter.mes + 1;
+      const { ano, mes } = parseExpenseYearMonth(expense.data);
+      return ano === dateFilter.ano && mes === dateFilter.mes;
     };
     const removedExpenses = expenses
       .map((expense, index) => ({ expense, index }))
@@ -273,7 +290,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
       });
       throw error;
     }
-  }, [API_BASE, dateFilter, expenses, onSessionExpired]);
+  }, [API_BASE, dateFilter, expenses, onSessionExpired, parseExpenseYearMonth]);
 
   const setLimit = useCallback(async (category, amount) => {
     const catClean = (category || "geral").toLowerCase().trim();
@@ -337,29 +354,12 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
     }
   }, [API_BASE, limits, onSessionExpired]);
 
-  const parseExpenseYearMonth = (dateStr) => {
-    if (!dateStr) return { ano: null, mes: null };
-    const dateOnly = String(dateStr).split("T")[0];
-    const parts = dateOnly.split("-");
-    if (parts.length === 3) {
-      return {
-        ano: parseInt(parts[0], 10),
-        mes: parseInt(parts[1], 10) - 1,
-      };
-    }
-    const d = new Date(dateStr);
-    return {
-      ano: d.getFullYear(),
-      mes: d.getMonth(),
-    };
-  };
-
   const filteredExpenses = useMemo(() => {
     return expenses.filter((g) => {
       const { ano, mes } = parseExpenseYearMonth(g.data);
       return mes === dateFilter.mes && ano === dateFilter.ano;
     });
-  }, [expenses, dateFilter]);
+  }, [expenses, dateFilter, parseExpenseYearMonth]);
 
   const previousMonthExpenses = useMemo(() => {
     const prevMonth = dateFilter.mes === 0 ? 11 : dateFilter.mes - 1;
@@ -368,7 +368,7 @@ export function useExpenses(dateFilter, isAuthenticated = true, onSessionExpired
       const { ano, mes } = parseExpenseYearMonth(g.data);
       return mes === prevMonth && ano === prevYear;
     });
-  }, [expenses, dateFilter]);
+  }, [expenses, dateFilter, parseExpenseYearMonth]);
 
   const stats = useMemo(() => {
     return calculateStats(filteredExpenses, previousMonthExpenses);

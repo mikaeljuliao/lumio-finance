@@ -20,16 +20,22 @@ export function parseCurrencyInput(value) {
   return Number.isFinite(numericValue) ? numericValue : null;
 }
 
+export function extractDateOnly(dateString) {
+  if (!dateString) return "";
+  return String(dateString).split("T")[0];
+}
+
 export function getLocalDateInputValue(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const d = date instanceof Date ? date : new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 export function formatDate(dateString) {
   if (!dateString) return "";
-  const dateOnly = String(dateString).split("T")[0];
+  const dateOnly = extractDateOnly(dateString);
   const [year, month, day] = dateOnly.split("-");
   if (year && month && day) {
     return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
@@ -39,12 +45,12 @@ export function formatDate(dateString) {
 
 export function formatRelativeDate(dateString) {
   if (!dateString) return "";
-  const dateOnly = String(dateString).split("T")[0];
-  const today = new Date().toISOString().split("T")[0];
+  const dateOnly = extractDateOnly(dateString);
+  const today = getLocalDateInputValue();
 
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterday = yesterdayDate.toISOString().split("T")[0];
+  const yesterday = getLocalDateInputValue(yesterdayDate);
 
   if (dateOnly === today) return "Hoje";
   if (dateOnly === yesterday) return "Ontem";
@@ -57,7 +63,7 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
   const previousTotal = previousMonthExpenses.reduce((acc, g) => acc + Number(g.valor), 0);
   const spendingDays = new Set(
     filteredExpenses
-      .map((expense) => String(expense.data || "").split("T")[0])
+      .map((expense) => extractDateOnly(expense.data))
       .filter(Boolean)
   );
   const average = spendingDays.size > 0 ? total / spendingDays.size : 0;
@@ -74,7 +80,7 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
     .sort((a, b) => b.value - a.value);
 
   const byDate = filteredExpenses.reduce((acc, g) => {
-    const dateOnly = String(g.data || "").split("T")[0];
+    const dateOnly = extractDateOnly(g.data);
     if (!dateOnly) return acc;
     const [, month, day] = dateOnly.split("-");
     const label = day ? `${day}/${month}` : new Date(g.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -111,7 +117,7 @@ export function calculateStats(filteredExpenses, previousMonthExpenses) {
 export function groupTransactionsByDate(transactions) {
   const groups = {};
   for (const item of transactions) {
-    const key = String(item.data || "").split("T")[0] || "Sem data";
+    const key = extractDateOnly(item.data) || "Sem data";
     if (!groups[key]) {
       groups[key] = [];
     }

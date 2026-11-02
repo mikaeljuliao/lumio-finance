@@ -5,6 +5,7 @@ import { getApiBaseUrl, getSessionToken } from "../lib/config";
 export function useWhatsAppSocket(onNewExpense) {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const socketRef = useRef(null);
+  const isEnabled = Boolean(onNewExpense);
 
   const onNewExpenseRef = useRef(onNewExpense);
   useEffect(() => {
@@ -12,6 +13,15 @@ export function useWhatsAppSocket(onNewExpense) {
   }, [onNewExpense]);
 
   useEffect(() => {
+    if (!isEnabled) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setIsSocketConnected(false);
+      }
+      return undefined;
+    }
+
     const socketUrl = getApiBaseUrl();
     const token = getSessionToken();
 
@@ -19,6 +29,7 @@ export function useWhatsAppSocket(onNewExpense) {
       withCredentials: true,
       transports: ["websocket", "polling"],
       auth: { token },
+      autoConnect: true,
     });
     socketRef.current = socket;
 
@@ -40,11 +51,18 @@ export function useWhatsAppSocket(onNewExpense) {
       }
     });
 
+    if (socket.io) {
+      socket.io.on("reconnect_attempt", () => {
+        socket.auth = { token: getSessionToken() };
+      });
+    }
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setIsSocketConnected(false);
     };
-  }, []);
+  }, [isEnabled]);
 
   return { isSocketConnected };
 }
